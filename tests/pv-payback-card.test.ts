@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   PVPaybackCardEditor,
+  PVPaybackCard,
   cacheKey,
   calculatePayback,
   chooseEnergyValue,
@@ -63,6 +64,60 @@ describe("calculatePayback", () => {
     expect(result.selfConsumption).toBe(0);
     expect(result.exported).toBe(0);
     expect(result.paybackDate).toBeUndefined();
+  });
+});
+
+describe("production-based self-consumption", () => {
+  const productionConfig: PVPaybackCardConfig = {
+    ...config,
+    self_consumption_entity: undefined,
+    production_energy_entity: "sensor.production",
+  };
+
+  it("calculates self-consumption from production minus export", () => {
+    const result = calculatePayback(productionConfig, 1100 - 550, 550);
+    expect(result.selfConsumption).toBe(550);
+    expect(result.ownValue).toBe(165);
+  });
+
+  it("uses a separate cache scope for production-based input", () => {
+    expect(cacheKey(config, config.export_energy_entity)).not.toBe(
+      cacheKey(productionConfig, productionConfig.export_energy_entity),
+    );
+  });
+
+  it("does not make derived self-consumption clickable", async () => {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.production": { state: "1100", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "550", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language: "en" },
+    };
+    card.setConfig(productionConfig);
+    document.body.append(card);
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".own")?.getAttribute("role")).toBeNull();
+    expect(card.shadowRoot?.querySelector(".export")?.getAttribute("role")).toBe("button");
+  });
+
+  it("prefers direct self-consumption when both input models are configured", async () => {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "1100", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.production": { state: "9999", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "550", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language: "en" },
+    };
+    card.setConfig({ ...productionConfig, self_consumption_entity: "sensor.own" });
+    document.body.append(card);
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".own b")?.textContent).toContain("1,100 kWh");
   });
 });
 
@@ -131,8 +186,8 @@ describe("last valid energy cache", () => {
 
   it("starts a separate cache scope when accounting inputs change", () => {
     const changed = { ...config, start_date: "2026-02-01", self_consumption_baseline: 5 };
-    expect(cacheKey(config, config.self_consumption_entity)).not.toBe(
-      cacheKey(changed, changed.self_consumption_entity),
+    expect(cacheKey(config, config.self_consumption_entity!)).not.toBe(
+      cacheKey(changed, changed.self_consumption_entity!),
     );
   });
 });
@@ -173,9 +228,10 @@ describe("configuration editor", () => {
     const pickers = Array.from(
       editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
     ) as Array<HTMLElement & { value?: string }>;
-    expect(pickers).toHaveLength(2);
+    expect(pickers).toHaveLength(3);
     expect(pickers.map((picker) => picker.value)).toEqual([
       config.self_consumption_entity,
+      "",
       config.export_energy_entity,
     ]);
   });
@@ -191,9 +247,10 @@ describe("configuration editor", () => {
     ) as Array<HTMLElement & { label?: string }>;
     expect(pickers.map((picker) => picker.label)).toEqual([
       "Self-consumption energy entity",
+      "PV production energy entity",
       "Export energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(11);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(12);
   });
 
   it("emits the complete configuration after an entity changes", async () => {

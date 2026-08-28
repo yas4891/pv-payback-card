@@ -14,8 +14,9 @@ export type PVPaybackCardConfig = {
   investment_cost: number;
   electricity_price: number;
   feed_in_tariff: number;
-  self_consumption_entity: string;
+  self_consumption_entity?: string;
   export_energy_entity: string;
+  production_energy_entity?: string;
   self_consumption_baseline?: number;
   export_energy_baseline?: number;
   name?: string;
@@ -27,6 +28,7 @@ export type PVPaybackCardConfig = {
   show_money_values?: boolean;
   show_payback_date?: boolean;
   show_progress?: boolean;
+  show_contribution_segments?: boolean;
 };
 
 type EnergyRead = { value?: number; warning?: string; cached: boolean; timestamp?: string };
@@ -85,6 +87,7 @@ const editorTranslations = {
     feed_in_tariff: "Einspeisevergütung pro kWh",
     self_consumption_entity: "Entität für Eigenverbrauch",
     export_energy_entity: "Entität für Einspeisung",
+    production_energy_entity: "Entität für PV-Produktion",
     self_consumption_baseline: "Ausgangswert Eigenverbrauch (kWh)",
     export_energy_baseline: "Ausgangswert Einspeisung (kWh)",
     show_breakdown: "Aufschlüsselung anzeigen",
@@ -92,6 +95,7 @@ const editorTranslations = {
     show_money_values: "Geldwerte anzeigen",
     show_payback_date: "Amortisationsdatum anzeigen",
     show_progress: "Fortschritt anzeigen",
+    show_contribution_segments: "Anteile im Fortschrittsbalken getrennt anzeigen",
   },
   en: {
     start_date: "Start date",
@@ -100,6 +104,7 @@ const editorTranslations = {
     feed_in_tariff: "Feed-in tariff per kWh",
     self_consumption_entity: "Self-consumption energy entity",
     export_energy_entity: "Export energy entity",
+    production_energy_entity: "PV production energy entity",
     self_consumption_baseline: "Self-consumption baseline (kWh)",
     export_energy_baseline: "Export baseline (kWh)",
     show_breakdown: "Show breakdown",
@@ -107,6 +112,7 @@ const editorTranslations = {
     show_money_values: "Show monetary values",
     show_payback_date: "Show payback date",
     show_progress: "Show progress",
+    show_contribution_segments: "Show separate contribution segments in progress bar",
   },
 } as const;
 
@@ -127,6 +133,7 @@ export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardC
     show_money_values: config.show_money_values ?? true,
     show_payback_date: config.show_payback_date ?? true,
     show_progress: config.show_progress ?? true,
+    show_contribution_segments: config.show_contribution_segments ?? false,
   };
 }
 
@@ -166,8 +173,10 @@ export function calculatePayback(
 }
 
 export function cacheKey(config: PVPaybackCardConfig, entity: string): string {
+  const directSelfConsumption = Boolean(config.self_consumption_entity);
   const scope = JSON.stringify([
-    config.self_consumption_entity,
+    directSelfConsumption ? "direct-self-consumption" : "derived-self-consumption",
+    directSelfConsumption ? config.self_consumption_entity : config.production_energy_entity,
     config.export_energy_entity,
     config.start_date,
     config.self_consumption_baseline ?? 0,
@@ -224,7 +233,11 @@ function validConfig(config: PVPaybackCardConfig): string | undefined {
     if (!Number.isFinite(config[key]) || config[key] < 0) return key;
   }
   if (config.investment_cost <= 0) return "investment_cost";
-  if (!config.self_consumption_entity || !config.export_energy_entity) return "energy entity";
+  if (
+    !config.export_energy_entity ||
+    (!config.self_consumption_entity && !config.production_energy_entity)
+  )
+    return "energy entity";
   return undefined;
 }
 
@@ -264,7 +277,7 @@ export class PVPaybackCardEditor extends LitElement {
   }
 
   private entityChanged(
-    name: "self_consumption_entity" | "export_energy_entity",
+    name: "self_consumption_entity" | "export_energy_entity" | "production_energy_entity",
     event: Event,
   ): void {
     const value = (event as CustomEvent<{ value?: unknown }>).detail?.value;
@@ -280,7 +293,7 @@ export class PVPaybackCardEditor extends LitElement {
   }
 
   private entityField(
-    name: "self_consumption_entity" | "export_energy_entity",
+    name: "self_consumption_entity" | "export_energy_entity" | "production_energy_entity",
     label: string,
   ): TemplateResult {
     const value = String(this._config[name] ?? "");
@@ -328,7 +341,7 @@ export class PVPaybackCardEditor extends LitElement {
       /></label>`;
     return html`${requiredFields.map(
       textField,
-    )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
+    )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
       textField,
     )}${(
       [
@@ -337,6 +350,7 @@ export class PVPaybackCardEditor extends LitElement {
         "show_money_values",
         "show_payback_date",
         "show_progress",
+        "show_contribution_segments",
       ] as const
     ).map(
       (name) =>
@@ -344,7 +358,11 @@ export class PVPaybackCardEditor extends LitElement {
           ><input
             name=${name}
             type="checkbox"
-            .checked=${this._config[name] !== false}
+            .checked=${
+              name === "show_contribution_segments"
+                ? this._config[name] === true
+                : this._config[name] !== false
+            }
             @change=${this.changed}
           />${text[name]}</label
         >`,
@@ -391,6 +409,7 @@ export class PVPaybackCard extends LitElement {
       show_money_values: true,
       show_payback_date: true,
       show_progress: true,
+      show_contribution_segments: false,
     };
   }
 
@@ -467,6 +486,22 @@ export class PVPaybackCard extends LitElement {
     );
   }
 
+  private openMoreInfo(entityId: string): void {
+    this.dispatchEvent(
+      new CustomEvent("hass-more-info", {
+        detail: { entityId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private handleBreakdownKeydown(event: KeyboardEvent, entityId: string): void {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    this.openMoreInfo(entityId);
+  }
+
   render(): TemplateResult | typeof nothing {
     const config = this._config;
     if (!config) return nothing;
@@ -476,49 +511,108 @@ export class PVPaybackCard extends LitElement {
       return html`<ha-card
         ><div class="content error" role="alert">${t.invalid}: ${configError}</div></ha-card
       >`;
-    const self = this.readEnergy(config, config.self_consumption_entity, t);
+    const self = config.self_consumption_entity
+      ? this.readEnergy(config, config.self_consumption_entity, t)
+      : undefined;
+    const production =
+      !self && config.production_energy_entity
+        ? this.readEnergy(config, config.production_energy_entity, t)
+        : undefined;
     const exported = this.readEnergy(config, config.export_energy_entity, t);
-    if (self.value === undefined || exported.value === undefined)
+    const sourceReadings = [self, production, exported].filter((reading): reading is EnergyRead =>
+      Boolean(reading),
+    );
+    const selfValue = self?.value;
+    const productionValue = production?.value;
+    const exportedValue = exported.value;
+    if (
+      exportedValue === undefined ||
+      (self !== undefined && selfValue === undefined) ||
+      (production !== undefined && productionValue === undefined)
+    )
       return html`<ha-card
         ><div class="content error" role="alert">
-          ${t.unavailable}${self.warning ? html`<br />${self.warning}` : nothing}${
-            exported.warning ? html`<br />${exported.warning}` : nothing
-          }
+          ${t.unavailable}${sourceReadings.map((reading) =>
+            reading.warning ? html`<br />${reading.warning}` : nothing,
+          )}
         </div></ha-card
       >`;
-    const calc = calculatePayback(config, self.value, exported.value);
-    const cached = self.cached || exported.cached;
-    const cacheTime = [self.timestamp, exported.timestamp].filter(Boolean).sort().at(0);
+    const selfConsumption = selfValue ?? productionValue! - exportedValue;
+    const calc = calculatePayback(config, selfConsumption, exportedValue);
+    const cached = sourceReadings.some((reading) => reading.cached);
+    const cacheTime = sourceReadings
+      .map((reading) => reading.timestamp)
+      .filter(Boolean)
+      .sort()
+      .at(0);
+    const ownContribution = Math.min(
+      100,
+      Math.max(0, (calc.ownValue / config.investment_cost) * 100),
+    );
+    const exportContribution = Math.min(
+      Math.max(0, 100 - ownContribution),
+      Math.max(0, (calc.exportValue / config.investment_cost) * 100),
+    );
     return html`<ha-card>
       <div class="content">
         <div class="header">
-          <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
-          ><span>${displayName(config.name, t.title)}</span>
+          <div class="header-title">
+            <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
+            ><span>${displayName(config.name, t.title)}</span>
+          </div>
+          ${
+            config.show_progress
+              ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
+              : nothing
+          }
         </div>
         <div class="benefit">
           <span>${t.benefit}</span><strong>${this.formatMoney(calc.benefit)}</strong>
         </div>
         ${
           config.show_progress
-            ? html`<div class="progress-label">
-                  <span>${t.progress}</span><span>${calc.progress.toFixed(1)}%</span>
-                </div>
-                <div
-                  class="bar"
-                  role="progressbar"
-                  aria-label=${t.progress}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow=${calc.progress}
-                >
-                  <div style=${`width:${calc.progress}%`}></div>
-                </div>`
+            ? html`<div
+                class="bar ${config.show_contribution_segments ? "contribution-segments" : ""}"
+                role="progressbar"
+                aria-label=${t.progress}
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow=${calc.progress}
+              >
+                ${
+                  config.show_contribution_segments
+                    ? html`<div class="contribution-own" style=${`width:${ownContribution}%`}></div>
+                        <div
+                          class="contribution-export"
+                          style=${`width:${exportContribution}%`}
+                        ></div>`
+                    : html`<div style=${`width:${calc.progress}%`}></div>`
+                }
+              </div>`
             : nothing
         }
         ${
           config.show_breakdown && (config.show_energy_values || config.show_money_values)
-            ? html`<div class="breakdown">
-                <div>
+            ? html`<div
+                class="breakdown ${config.show_contribution_segments ? "contribution-segments" : ""}"
+              >
+                <div
+                  class="own"
+                  role=${config.self_consumption_entity ? "button" : nothing}
+                  tabindex=${config.self_consumption_entity ? "0" : nothing}
+                  aria-label=${config.self_consumption_entity ? t.own : nothing}
+                  @click=${
+                    config.self_consumption_entity
+                      ? () => this.openMoreInfo(config.self_consumption_entity!)
+                      : nothing
+                  }
+                  @keydown=${
+                    config.self_consumption_entity
+                      ? (event: KeyboardEvent) =>
+                          this.handleBreakdownKeydown(event, config.self_consumption_entity!)
+                      : nothing
+                  }
+                >
                   <span>${t.own}</span
                   ><b
                     >${
@@ -530,7 +624,15 @@ export class PVPaybackCard extends LitElement {
                     }</b
                   >
                 </div>
-                <div>
+                <div
+                  class="export"
+                  role="button"
+                  tabindex="0"
+                  aria-label=${t.export}
+                  @click=${() => this.openMoreInfo(config.export_energy_entity)}
+                  @keydown=${(event: KeyboardEvent) =>
+                    this.handleBreakdownKeydown(event, config.export_energy_entity)}
+                >
                   <span>${t.export}</span
                   ><b
                     >${
@@ -546,7 +648,7 @@ export class PVPaybackCard extends LitElement {
             : nothing
         }
         ${config.show_payback_date ? html`<div class="date"><span>${t.expected}</span><b>${calc.paybackDate ? new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "medium" }).format(calc.paybackDate) : t.noProjection}</b></div>` : nothing}
-        ${cached ? html`<div class="notice" role="status" aria-live="polite">${t.cached}${cacheTime ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "short", timeStyle: "short" }).format(new Date(cacheTime))}` : ""}${self.warning ? html`<br />${self.warning}` : nothing}${exported.warning ? html`<br />${exported.warning}` : nothing}</div>` : nothing}
+        ${cached ? html`<div class="notice" role="status" aria-live="polite">${t.cached}${cacheTime ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "short", timeStyle: "short" }).format(new Date(cacheTime))}` : ""}${sourceReadings.map((reading) => (reading.warning ? html`<br />${reading.warning}` : nothing))}</div>` : nothing}
       </div>
     </ha-card>`;
   }
@@ -562,9 +664,19 @@ export class PVPaybackCard extends LitElement {
     .header {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
       font-size: 1.1em;
       font-weight: 600;
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .header-progress {
+      color: var(--primary-color);
+      white-space: nowrap;
     }
     ha-icon {
       color: var(--primary-color);
@@ -578,7 +690,6 @@ export class PVPaybackCard extends LitElement {
     .benefit strong {
       font-size: 1.7em;
     }
-    .progress-label,
     .date {
       display: flex;
       justify-content: space-between;
@@ -601,6 +712,21 @@ export class PVPaybackCard extends LitElement {
       border-radius: inherit;
       transition: width 0.2s;
     }
+    .bar.contribution-segments {
+      display: flex;
+    }
+    .bar.contribution-segments div {
+      flex-shrink: 0;
+      border-radius: 0;
+    }
+    .bar.contribution-segments .contribution-own {
+      background: var(--info-color, #03a9f4);
+      border-radius: 99px 0 0 99px;
+    }
+    .bar.contribution-segments .contribution-export {
+      background: var(--success-color, #4caf50);
+      border-radius: 0 99px 99px 0;
+    }
     .breakdown {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -613,12 +739,29 @@ export class PVPaybackCard extends LitElement {
     }
     .breakdown span,
     .date span,
-    .progress-label span:first-child,
     .benefit span {
       color: var(--secondary-text-color);
     }
     .breakdown b {
       font-size: 0.92em;
+    }
+    .breakdown div[role="button"] {
+      cursor: pointer;
+    }
+    .breakdown div[role="button"]:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 4px;
+      border-radius: 4px;
+    }
+    .breakdown.contribution-segments .own,
+    .breakdown.contribution-segments .own span,
+    .breakdown.contribution-segments .own b {
+      color: var(--info-color, #03a9f4);
+    }
+    .breakdown.contribution-segments .export,
+    .breakdown.contribution-segments .export span,
+    .breakdown.contribution-segments .export b {
+      color: var(--success-color, #4caf50);
     }
     .date {
       align-items: start;
