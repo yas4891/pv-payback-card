@@ -1,13 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  PVPaybackCardEditor,
   cacheKey,
   calculatePayback,
   chooseEnergyValue,
+  displayName,
   energyToKwh,
   parseCachedEnergy,
   readCachedEnergy,
+  withDisplayDefaults,
   type PVPaybackCardConfig,
 } from "../src/pv-payback-card";
+
+if (!customElements.get("ha-entity-picker")) {
+  customElements.define("ha-entity-picker", class extends HTMLElement {});
+}
 
 const config: PVPaybackCardConfig = {
   type: "custom:pv-payback-card",
@@ -59,6 +66,35 @@ describe("calculatePayback", () => {
   });
 });
 
+describe("display configuration", () => {
+  it("uses the localized title for the former generated card name", () => {
+    expect(displayName("PV-Amortisation", "Amortisation der PV-Anlage")).toBe(
+      "Amortisation der PV-Anlage",
+    );
+    expect(displayName("PV-Amortisation", "PV payback")).toBe("PV payback");
+  });
+
+  it("preserves an explicitly configured card name", () => {
+    expect(displayName("My solar investment", "PV payback")).toBe("My solar investment");
+  });
+
+  it("enables detailed energy and monetary values by default", () => {
+    expect(withDisplayDefaults(config)).toMatchObject({
+      show_breakdown: true,
+      show_energy_values: true,
+      show_money_values: true,
+      show_payback_date: true,
+      show_progress: true,
+    });
+  });
+
+  it("preserves explicitly disabled detailed values", () => {
+    expect(
+      withDisplayDefaults({ ...config, show_energy_values: false, show_money_values: false }),
+    ).toMatchObject({ show_energy_values: false, show_money_values: false });
+  });
+});
+
 describe("last valid energy cache", () => {
   it("uses a persisted value when the current entity is unavailable after reload", () => {
     const cached = parseCachedEnergy('{"value":123.4,"timestamp":"2026-01-10T12:00:00Z"}');
@@ -98,5 +134,83 @@ describe("last valid energy cache", () => {
     expect(cacheKey(config, config.self_consumption_entity)).not.toBe(
       cacheKey(changed, changed.self_consumption_entity),
     );
+  });
+});
+
+describe("configuration editor", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  async function createEditor(): Promise<PVPaybackCardEditor> {
+    const editor = document.createElement("pv-payback-card-editor") as PVPaybackCardEditor;
+    editor.hass = { states: {}, locale: { language: "en" } };
+    document.body.append(editor);
+    await editor.updateComplete;
+    return editor;
+  }
+
+  it("renders values after Home Assistant sets the configuration late", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+
+    expect(
+      (editor.shadowRoot?.querySelector('[name="investment_cost"]') as HTMLInputElement).value,
+    ).toBe("10000");
+    expect(
+      (editor.shadowRoot?.querySelector('[name="start_date"]') as HTMLInputElement).value,
+    ).toBe("2026-01-01");
+  });
+
+  it("passes the configured entity values to each picker", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+
+    const pickers = Array.from(
+      editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
+    ) as Array<HTMLElement & { value?: string }>;
+    expect(pickers).toHaveLength(2);
+    expect(pickers.map((picker) => picker.value)).toEqual([
+      config.self_consumption_entity,
+      config.export_energy_entity,
+    ]);
+  });
+
+  it("uses each entity label only inside its picker", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+
+    const pickers = Array.from(
+      editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
+    ) as Array<HTMLElement & { label?: string }>;
+    expect(pickers.map((picker) => picker.label)).toEqual([
+      "Self-consumption energy entity",
+      "Export energy entity",
+    ]);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(11);
+  });
+
+  it("emits the complete configuration after an entity changes", async () => {
+    const editor = await createEditor();
+    const changes: Partial<PVPaybackCardConfig>[] = [];
+    editor.addEventListener("config-changed", (event) => {
+      changes.push((event as CustomEvent<{ config: Partial<PVPaybackCardConfig> }>).detail.config);
+    });
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+    editor.shadowRoot
+      ?.querySelector("ha-entity-picker")
+      ?.dispatchEvent(
+        new CustomEvent("value-changed", { detail: { value: "sensor.updated_self" } }),
+      );
+
+    expect(changes).toEqual([{ ...config, self_consumption_entity: "sensor.updated_self" }]);
   });
 });

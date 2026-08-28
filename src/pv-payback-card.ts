@@ -23,6 +23,8 @@ export type PVPaybackCardConfig = {
   currency?: string;
   locale?: string;
   show_breakdown?: boolean;
+  show_energy_values?: boolean;
+  show_money_values?: boolean;
   show_payback_date?: boolean;
   show_progress?: boolean;
 };
@@ -42,7 +44,7 @@ type Calculation = {
 
 const translations = {
   de: {
-    title: "PV-Amortisation",
+    title: "Amortisation der PV-Anlage",
     benefit: "Bisheriger Ertrag",
     progress: "Amortisation",
     own: "Eigenverbrauch",
@@ -86,6 +88,8 @@ const editorTranslations = {
     self_consumption_baseline: "Ausgangswert Eigenverbrauch (kWh)",
     export_energy_baseline: "Ausgangswert Einspeisung (kWh)",
     show_breakdown: "Aufschlüsselung anzeigen",
+    show_energy_values: "Energiewerte anzeigen",
+    show_money_values: "Geldwerte anzeigen",
     show_payback_date: "Amortisationsdatum anzeigen",
     show_progress: "Fortschritt anzeigen",
   },
@@ -99,6 +103,8 @@ const editorTranslations = {
     self_consumption_baseline: "Self-consumption baseline (kWh)",
     export_energy_baseline: "Export baseline (kWh)",
     show_breakdown: "Show breakdown",
+    show_energy_values: "Show energy values",
+    show_money_values: "Show monetary values",
     show_payback_date: "Show payback date",
     show_progress: "Show progress",
   },
@@ -111,6 +117,21 @@ function isUnit(value: unknown): value is Unit {
 export function energyToKwh(value: number, unit: unknown): number | undefined {
   if (!Number.isFinite(value) || !isUnit(unit)) return undefined;
   return unit === "Wh" ? value / 1000 : unit === "MWh" ? value * 1000 : value;
+}
+
+export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardConfig {
+  return {
+    ...config,
+    show_breakdown: config.show_breakdown ?? true,
+    show_energy_values: config.show_energy_values ?? true,
+    show_money_values: config.show_money_values ?? true,
+    show_payback_date: config.show_payback_date ?? true,
+    show_progress: config.show_progress ?? true,
+  };
+}
+
+export function displayName(name: string | undefined, localizedTitle: string): string {
+  return !name || name === "PV-Amortisation" ? localizedTitle : name;
 }
 
 export function calculatePayback(
@@ -207,10 +228,15 @@ function validConfig(config: PVPaybackCardConfig): string | undefined {
   return undefined;
 }
 
-class PVPaybackCardEditor extends LitElement {
+export class PVPaybackCardEditor extends LitElement {
   static properties = { hass: { attribute: false }, _config: { state: true } };
-  hass?: HomeAssistant;
-  _config: Partial<PVPaybackCardConfig> = {};
+  declare hass?: HomeAssistant;
+  declare _config: Partial<PVPaybackCardConfig>;
+
+  constructor() {
+    super();
+    this._config = {};
+  }
 
   setConfig(config: PVPaybackCardConfig): void {
     this._config = { ...config };
@@ -259,20 +285,19 @@ class PVPaybackCardEditor extends LitElement {
   ): TemplateResult {
     const value = String(this._config[name] ?? "");
     const pickerAvailable = Boolean(this.hass && customElements.get("ha-entity-picker"));
+    if (pickerAvailable) {
+      return html`<ha-entity-picker
+        .hass=${this.hass}
+        .value=${value}
+        .label=${label}
+        .includeDomains=${["sensor"]}
+        .allowCustomEntity=${true}
+        @value-changed=${(event: Event) => this.entityChanged(name, event)}
+      ></ha-entity-picker>`;
+    }
     return html`<label
-      >${label}${
-        pickerAvailable
-          ? html`<ha-entity-picker
-              .hass=${this.hass}
-              .value=${value}
-              .label=${label}
-              .includeDomains=${["sensor"]}
-              .allowCustomEntity=${true}
-              @value-changed=${(event: Event) => this.entityChanged(name, event)}
-            ></ha-entity-picker>`
-          : html`<input name=${name} type="text" .value=${value} @change=${this.changed} />`
-      }</label
-    >`;
+      >${label}<input name=${name} type="text" .value=${value} @change=${this.changed}
+    /></label>`;
   }
 
   render(): TemplateResult | typeof nothing {
@@ -305,7 +330,15 @@ class PVPaybackCardEditor extends LitElement {
       textField,
     )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
       textField,
-    )}${(["show_breakdown", "show_payback_date", "show_progress"] as const).map(
+    )}${(
+      [
+        "show_breakdown",
+        "show_energy_values",
+        "show_money_values",
+        "show_payback_date",
+        "show_progress",
+      ] as const
+    ).map(
       (name) =>
         html`<label
           ><input
@@ -345,16 +378,17 @@ class PVPaybackCardEditor extends LitElement {
 }
 customElements.define("pv-payback-card-editor", PVPaybackCardEditor);
 
-class PVPaybackCard extends LitElement {
+export class PVPaybackCard extends LitElement {
   static properties = { hass: { attribute: false }, _config: { state: true } };
-  hass?: HomeAssistant;
-  _config?: PVPaybackCardConfig;
+  declare hass?: HomeAssistant;
+  declare _config?: PVPaybackCardConfig;
 
   static getStubConfig(): Partial<PVPaybackCardConfig> {
     return {
       type: "custom:pv-payback-card",
-      name: "PV-Amortisation",
       show_breakdown: true,
+      show_energy_values: true,
+      show_money_values: true,
       show_payback_date: true,
       show_progress: true,
     };
@@ -365,12 +399,7 @@ class PVPaybackCard extends LitElement {
   }
 
   setConfig(config: PVPaybackCardConfig): void {
-    this._config = {
-      ...config,
-      show_breakdown: config.show_breakdown ?? true,
-      show_payback_date: config.show_payback_date ?? true,
-      show_progress: config.show_progress ?? true,
-    };
+    this._config = withDisplayDefaults(config);
   }
 
   getCardSize(): number {
@@ -433,7 +462,7 @@ class PVPaybackCard extends LitElement {
   private formatEnergy(value: number): string {
     return (
       new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
-        maximumFractionDigits: 1,
+        maximumFractionDigits: 0,
       }).format(value) + " kWh"
     );
   }
@@ -463,8 +492,8 @@ class PVPaybackCard extends LitElement {
     return html`<ha-card>
       <div class="content">
         <div class="header">
-          <ha-icon .icon=${config.icon ?? "mdi:solar-power"}></ha-icon
-          ><span>${config.name ?? t.title}</span>
+          <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
+          ><span>${displayName(config.name, t.title)}</span>
         </div>
         <div class="benefit">
           <span>${t.benefit}</span><strong>${this.formatMoney(calc.benefit)}</strong>
@@ -487,19 +516,30 @@ class PVPaybackCard extends LitElement {
             : nothing
         }
         ${
-          config.show_breakdown
+          config.show_breakdown && (config.show_energy_values || config.show_money_values)
             ? html`<div class="breakdown">
                 <div>
                   <span>${t.own}</span
                   ><b
-                    >${this.formatEnergy(calc.selfConsumption)} ·
-                    ${this.formatMoney(calc.ownValue)}</b
+                    >${
+                      config.show_energy_values && config.show_money_values
+                        ? `${this.formatEnergy(calc.selfConsumption)} · ${this.formatMoney(calc.ownValue)}`
+                        : config.show_energy_values
+                          ? this.formatEnergy(calc.selfConsumption)
+                          : this.formatMoney(calc.ownValue)
+                    }</b
                   >
                 </div>
                 <div>
                   <span>${t.export}</span
                   ><b
-                    >${this.formatEnergy(calc.exported)} · ${this.formatMoney(calc.exportValue)}</b
+                    >${
+                      config.show_energy_values && config.show_money_values
+                        ? `${this.formatEnergy(calc.exported)} · ${this.formatMoney(calc.exportValue)}`
+                        : config.show_energy_values
+                          ? this.formatEnergy(calc.exported)
+                          : this.formatMoney(calc.exportValue)
+                    }</b
                   >
                 </div>
               </div>`
