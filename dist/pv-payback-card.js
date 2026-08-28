@@ -912,7 +912,11 @@ class je extends b {
     }
     .bar div {
       height: 100%;
-      background: var(--primary-color);
+      background: linear-gradient(
+        90deg,
+        var(--info-color, #03a9f4) 0%,
+        var(--success-color, #4caf50) 100%
+      );
       border-radius: inherit;
       transition: width 0.2s;
     }
