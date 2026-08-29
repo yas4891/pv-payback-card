@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.4 - 2026-08-29
+
+- Delayed cached-data warnings until the underlying problem persists continuously for three minutes.
+
 ## 0.3.3 - 2026-08-29
 
 - Added negative baseline values for carrying energy forward after counter replacements.

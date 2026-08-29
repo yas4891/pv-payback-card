@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PVPaybackCardEditor,
   PVPaybackCard,
@@ -581,6 +581,80 @@ describe("last valid energy cache", () => {
     expect(cacheKey(config, config.self_consumption_entity!)).not.toBe(
       cacheKey(changed, changed.self_consumption_entity!),
     );
+  });
+});
+
+describe("persistent warning delay", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    document.body.replaceChildren();
+  });
+
+  async function createRegressedCard(): Promise<PVPaybackCard> {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    localStorage.setItem(
+      cacheKey(config, config.self_consumption_entity!),
+      JSON.stringify({ value: 101, timestamp: "2026-01-10T12:00:00Z" }),
+    );
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "100", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "50", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language: "en" },
+      config: { currency: "EUR" },
+    };
+    card.setConfig(config);
+    document.body.append(card);
+    await card.updateComplete;
+    return card;
+  }
+
+  it("shows a persistent counter regression only after three minutes", async () => {
+    vi.useFakeTimers();
+    const card = await createRegressedCard();
+
+    expect(card.shadowRoot?.querySelector(".warning-indicator")).toBeNull();
+    await vi.advanceTimersByTimeAsync(179_999);
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector(".warning-indicator")).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector(".warning-indicator")).not.toBeNull();
+  });
+
+  it("restarts the delay after the counter briefly recovers", async () => {
+    vi.useFakeTimers();
+    const card = await createRegressedCard();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    card.hass = {
+      ...card.hass!,
+      states: {
+        ...card.hass!.states,
+        "sensor.own": { state: "102", attributes: { unit_of_measurement: "kWh" } },
+      },
+    };
+    await card.updateComplete;
+    card.hass = {
+      ...card.hass,
+      states: {
+        ...card.hass.states,
+        "sensor.own": { state: "100", attributes: { unit_of_measurement: "kWh" } },
+      },
+    };
+    await card.updateComplete;
+    await vi.advanceTimersByTimeAsync(120_000);
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".warning-indicator")).toBeNull();
   });
 });
 

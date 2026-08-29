@@ -42,7 +42,13 @@ export type StatisticRow = { start?: string | number; start_time?: string; sum?:
 export type HistoricalStatistics = Record<string, StatisticRow[]>;
 export type DailyEnergy = { date: string; selfConsumption: number; exported: number };
 
-type EnergyRead = { value?: number; warning?: string; cached: boolean; timestamp?: string };
+type EnergyRead = {
+  value?: number;
+  warning?: string;
+  cached: boolean;
+  timestamp?: string;
+  issueKey?: string;
+};
 export type CachedEnergy = { value: number; timestamp?: string };
 type Calculation = {
   selfConsumption: number;
@@ -63,6 +69,7 @@ export type ScenarioCalculations = {
 
 const DAYS_PER_YEAR = 365.2425;
 const MAXIMUM_FORECAST_DAYS = 366 * 50;
+const WARNING_DELAY_MS = 3 * 60 * 1000;
 const historicalStatisticsCache = new Map<string, Promise<HistoricalStatistics | undefined>>();
 
 const translations = {
@@ -925,6 +932,7 @@ export class PVPaybackCard extends LitElement {
     this._historicalStatisticsKey = undefined;
     this._calculationCache = undefined;
     this._scenarioCalculationCache = undefined;
+    this.resetWarningDelay();
   }
 
   private _historicalStatistics?: HistoricalStatistics;
@@ -933,6 +941,55 @@ export class PVPaybackCard extends LitElement {
   private _scenarioCalculationCache?: { key: string; scenarios: ScenarioCalculations };
   private _comparisonDiscountRate = 3;
   private _comparisonUsesDefaultRate = true;
+  private _warningStartedAt = new Map<string, number>();
+  private _warningTimer?: ReturnType<typeof setTimeout>;
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.resetWarningDelay();
+  }
+
+  private resetWarningDelay(): void {
+    this._warningStartedAt.clear();
+    if (this._warningTimer !== undefined) clearTimeout(this._warningTimer);
+    this._warningTimer = undefined;
+  }
+
+  private persistentWarningReadings(readings: EnergyRead[]): EnergyRead[] {
+    const now = Date.now();
+    const active = readings.filter(
+      (reading): reading is EnergyRead & { issueKey: string } =>
+        reading.cached && reading.issueKey !== undefined,
+    );
+    const activeKeys = new Set(active.map((reading) => reading.issueKey));
+    for (const key of this._warningStartedAt.keys()) {
+      if (!activeKeys.has(key)) this._warningStartedAt.delete(key);
+    }
+    for (const reading of active) {
+      if (!this._warningStartedAt.has(reading.issueKey)) {
+        this._warningStartedAt.set(reading.issueKey, now);
+      }
+    }
+
+    const visible = active.filter(
+      (reading) => now - this._warningStartedAt.get(reading.issueKey)! >= WARNING_DELAY_MS,
+    );
+    const remaining = active
+      .map((reading) => WARNING_DELAY_MS - (now - this._warningStartedAt.get(reading.issueKey)!))
+      .filter((delay) => delay > 0);
+    if (this._warningTimer !== undefined) clearTimeout(this._warningTimer);
+    this._warningTimer = undefined;
+    if (remaining.length > 0) {
+      this._warningTimer = setTimeout(
+        () => {
+          this._warningTimer = undefined;
+          this.requestUpdate();
+        },
+        Math.min(...remaining),
+      );
+    }
+    return visible;
+  }
 
   protected updated(): void {
     const config = this._config;
@@ -987,6 +1044,9 @@ export class PVPaybackCard extends LitElement {
         cached: selected.cached,
         timestamp: selected.cached ? cached?.timestamp : state?.last_updated,
         warning: selected.regression ? `${entityId}: ${messages.counterRegression}` : undefined,
+        issueKey: selected.cached
+          ? `${entityId}:${selected.regression ? "regression" : "unavailable"}`
+          : undefined,
       };
     }
     const unit = state?.attributes?.unit_of_measurement;
@@ -1149,6 +1209,7 @@ export class PVPaybackCard extends LitElement {
     const sourceReadings = [self, production, exported].filter((reading): reading is EnergyRead =>
       Boolean(reading),
     );
+    const warningReadings = this.persistentWarningReadings(sourceReadings);
     const selfValue = self?.value;
     const productionValue = production?.value;
     const exportedValue = exported.value;
@@ -1214,8 +1275,8 @@ export class PVPaybackCard extends LitElement {
       }
       scenarios = this._scenarioCalculationCache.scenarios;
     }
-    const cached = sourceReadings.some((reading) => reading.cached);
-    const cacheTime = sourceReadings
+    const cached = warningReadings.length > 0;
+    const cacheTime = warningReadings
       .map((reading) => reading.timestamp)
       .filter(Boolean)
       .sort()
@@ -1228,7 +1289,7 @@ export class PVPaybackCard extends LitElement {
                 timeStyle: "short",
               }).format(new Date(cacheTime))}`
             : ""
-        }${sourceReadings
+        }${warningReadings
           .filter((reading) => reading.warning)
           .map((reading) => ` ${reading.warning}`)
           .join("")}`
