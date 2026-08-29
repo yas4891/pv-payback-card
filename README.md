@@ -25,6 +25,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It also preserves the latest va
 - Configurable start date, investment cost, electricity price, and feed-in tariff.
 - Cumulative production and export-energy entities, or a direct self-consumption entity, chosen in the visual editor.
 - Payback forecast from the observed average financial benefit since the start date.
+- Optional location-aware seasonal forecast, calculated locally from the Home Assistant location.
 - Optional baseline values for counters that started before the accounting period.
 - Optional energy and monetary values in the detailed breakdown.
 - Optional blue and green contribution segments with clickable source-entity details.
@@ -77,9 +78,13 @@ electricity_price: 0.20
 feed_in_tariff: 0.075
 production_energy_entity: sensor.pv_production_total
 export_energy_entity: sensor.pv_export_total
+use_location_seasonality: true
+annual_discount_rate: 3.5
+use_historical_statistics: true
 ```
 
 The card calculates self-consumption as production minus export. The card uses cumulative energy values, not current power values.
+When enabled, valid Home Assistant coordinates confirm the location. The latitude determines the seasonal curve. No location fields are required in the card configuration.
 
 ## Energy input models
 
@@ -114,16 +119,25 @@ See [Combining production from multiple inverters](https://github.com/yas4891/pv
 | `show_payback_date`          | No       | `true`                    | Shows the estimated payback date. Set `false` when only the progress is needed.                                                                                                                                                                                                                  |
 | `show_progress`              | No       | `true`                    | Shows the percentage and progress bar. Set `false` when the financial value is sufficient.                                                                                                                                                                                                       |
 | `show_contribution_segments` | No       | `false`                   | Shows self-consumption as a blue segment and export as a green segment in the progress bar. The corresponding breakdown values use the same colors and open source details when clicked.                                                                                                         |
+| `use_location_seasonality`   | No       | `false`                   | Uses a local seasonal solar-potential forecast after valid Home Assistant coordinates confirm the location. The latitude determines the seasonal curve. The card uses the existing linear forecast when the location is missing or invalid.                                                      |
+| `annual_discount_rate`       | No       | `0`                       | Annual discount rate as a percentage. Example: `3.5` means 3.5% per year. `0` preserves the existing nominal calculation.                                                                                                                                                                        |
+| `use_historical_statistics`  | No       | `false`                   | Uses Home Assistant daily recorder statistics to place past discounted cashflows on their actual days. This option only applies with a positive `annual_discount_rate`.                                                                                                                          |
 
 ## Calculation and data availability
 
 The card calculates the benefit as self-consumed energy times `electricity_price`, plus exported energy times `feed_in_tariff`. With production input, self-consumed energy equals production minus export. It projects the payback date from the average benefit since `start_date`.
 
+When `use_location_seasonality` is `true`, the card estimates daily solar potential from the Home Assistant latitude. It converts observed benefit per accumulated solar potential into future daily benefit. This calculation runs locally and makes no network requests. The card uses the linear forecast when the option is disabled, coordinates are unavailable or invalid, or a seasonal result cannot be calculated.
+
+Set `annual_discount_rate` as a percentage, not a fraction. The card discounts each daily cashflow from `start_date` using 365.2425 days per year. A positive rate can delay payback. It can also make payback impossible within the forecast limit.
+
+With `use_historical_statistics: true`, the card requests only daily `sum` statistics through Home Assistant's recorder WebSocket API. It never requests raw history. The browser shares one successful or failed request per source, start date, and completed end date during its session. The card renders immediately with an even daily approximation. It updates once when recorder data arrives. Missing statistics, an unavailable recorder, or a failed request keep the approximation active. Recorder retention and enabled statistics can limit available historical days.
+
 During a temporary `unknown` or `unavailable` state, the card uses the latest valid browser-stored reading. It visibly marks cached data and never treats a missing value as zero.
 
 If a cumulative counter briefly reports a lower value, the card keeps the higher cached value. It displays a localized warning that names the affected entity. Changing the selected input model, entities, date, or baselines starts a separate cache scope.
 
-The estimate does not model seasonality, tariff changes, maintenance, financing, or degradation. Use a helper that calculates cumulative monetary benefit when those assumptions need a more detailed model.
+The seasonal estimate assumes a constant self-consumption share. It does not model weather, shading, tariff changes, maintenance, financing, or degradation. Use a helper that calculates cumulative monetary benefit when those assumptions need a more detailed model.
 
 ## Development
 

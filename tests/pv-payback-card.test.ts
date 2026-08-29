@@ -4,11 +4,15 @@ import {
   PVPaybackCard,
   cacheKey,
   calculatePayback,
+  calculateSeasonalPaybackDate,
   chooseEnergyValue,
+  dailyEnergyFromStatistics,
   displayName,
   energyToKwh,
+  loadHistoricalStatistics,
   parseCachedEnergy,
   readCachedEnergy,
+  statisticDailyDeltas,
   withDisplayDefaults,
   type PVPaybackCardConfig,
 } from "../src/pv-payback-card";
@@ -64,6 +68,136 @@ describe("calculatePayback", () => {
     expect(result.selfConsumption).toBe(0);
     expect(result.exported).toBe(0);
     expect(result.paybackDate).toBeUndefined();
+  });
+
+  it("keeps nominal results exactly when the discount rate is zero", () => {
+    const now = new Date("2026-03-01T00:00:00");
+    const nominal = calculatePayback(config, 1100, 550, now);
+    const zeroRate = calculatePayback({ ...config, annual_discount_rate: 0 }, 1100, 550, now);
+    expect(zeroRate).toEqual(nominal);
+  });
+
+  it("reduces past benefit with a positive annual discount rate", () => {
+    const now = new Date("2030-01-01T00:00:00");
+    const nominal = calculatePayback(config, 20_000, 10_000, now);
+    const discounted = calculatePayback(
+      { ...config, annual_discount_rate: 10 },
+      20_000,
+      10_000,
+      now,
+    );
+    expect(discounted.benefit).toBeLessThan(nominal.benefit);
+    expect(discounted.progress).toBeLessThan(nominal.progress);
+  });
+
+  it("delays or prevents a discounted payback date", () => {
+    const now = new Date("2028-01-01T00:00:00");
+    const nominal = calculatePayback(config, 10_000, 5_000, now);
+    const discounted = calculatePayback({ ...config, annual_discount_rate: 5 }, 10_000, 5_000, now);
+    expect(discounted.paybackDate).toBeDefined();
+    expect(discounted.paybackDate!.getTime()).toBeGreaterThanOrEqual(
+      nominal.paybackDate?.getTime() ?? 0,
+    );
+    const impossible = calculatePayback(
+      { ...config, annual_discount_rate: 100, investment_cost: 1_000_000 },
+      10_000,
+      5_000,
+      now,
+    );
+    expect(impossible.paybackDate).toBeUndefined();
+  });
+
+  it("keeps the complete discounted historical benefit after payback", () => {
+    const result = calculatePayback(
+      { ...config, investment_cost: 100, annual_discount_rate: 5 },
+      1000,
+      500,
+      new Date("2027-01-01T00:00:00"),
+    );
+    expect(result.paybackDate).toBeDefined();
+    expect(result.benefit).toBeGreaterThan(300);
+    expect(result.benefit).toBe(result.ownValue + result.exportValue);
+  });
+
+  it("keeps the linear forecast when location seasonality is disabled", () => {
+    const now = new Date("2026-06-01T00:00:00");
+    const linear = calculatePayback(config, 1100, 550, now);
+    const disabled = calculatePayback(
+      { ...config, use_location_seasonality: false },
+      1100,
+      550,
+      now,
+      { latitude: 52.52, longitude: 13.405 },
+    );
+
+    expect(disabled.paybackDate?.getTime()).toBe(linear.paybackDate?.getTime());
+  });
+
+  it("falls back to the linear forecast for an invalid Home Assistant location", () => {
+    const now = new Date("2026-06-01T00:00:00");
+    const linear = calculatePayback(config, 1100, 550, now);
+    const invalidLocation = calculatePayback(
+      { ...config, use_location_seasonality: true },
+      1100,
+      550,
+      now,
+      { latitude: 91, longitude: 13.405 },
+    );
+
+    expect(invalidLocation.paybackDate?.getTime()).toBe(linear.paybackDate?.getTime());
+  });
+});
+
+describe("calculateSeasonalPaybackDate", () => {
+  it("returns the estimated historical payback day for an amortized installation", () => {
+    const now = new Date("2026-07-31T12:00:00");
+    const result = calculateSeasonalPaybackDate("2026-01-01", now, 12_000, 10_000, 52.52);
+
+    expect(result).toBeDefined();
+    expect(result!.getTime()).toBeLessThan(now.getTime());
+    expect(result!.getTime()).toBeGreaterThanOrEqual(new Date("2026-01-01").getTime());
+  });
+
+  it("changes the forecast for observations from different seasons", () => {
+    const winter = calculateSeasonalPaybackDate(
+      "2025-11-01",
+      new Date("2026-01-31T12:00:00"),
+      400,
+      10_000,
+      52.52,
+    );
+    const summer = calculateSeasonalPaybackDate(
+      "2025-05-01",
+      new Date("2025-07-31T12:00:00"),
+      400,
+      10_000,
+      52.52,
+    );
+
+    expect(winter).toBeDefined();
+    expect(summer).toBeDefined();
+    expect(winter!.getTime()).toBeLessThan(summer!.getTime());
+  });
+
+  it("uses opposite seasonal patterns for northern and southern latitudes", () => {
+    const northern = calculateSeasonalPaybackDate(
+      "2025-11-01",
+      new Date("2026-01-31T12:00:00"),
+      400,
+      10_000,
+      52.52,
+    );
+    const southern = calculateSeasonalPaybackDate(
+      "2025-11-01",
+      new Date("2026-01-31T12:00:00"),
+      400,
+      10_000,
+      -52.52,
+    );
+
+    expect(northern).toBeDefined();
+    expect(southern).toBeDefined();
+    expect(northern!.getTime()).toBeLessThan(southern!.getTime());
   });
 });
 
@@ -140,6 +274,9 @@ describe("display configuration", () => {
       show_money_values: true,
       show_payback_date: true,
       show_progress: true,
+      use_location_seasonality: false,
+      annual_discount_rate: 0,
+      use_historical_statistics: false,
     });
   });
 
@@ -147,6 +284,135 @@ describe("display configuration", () => {
     expect(
       withDisplayDefaults({ ...config, show_energy_values: false, show_money_values: false }),
     ).toMatchObject({ show_energy_values: false, show_money_values: false });
+  });
+});
+
+describe("historical daily statistics", () => {
+  it("forms defensive deltas from cumulative daily sums", () => {
+    expect([
+      ...statisticDailyDeltas([
+        { start: "2026-01-01T00:00:00", sum: 10 },
+        { start: "2026-01-02T00:00:00", sum: 15 },
+        { start: "2026-01-03T00:00:00", sum: 12 },
+        { start: "2026-01-04T00:00:00", sum: 20 },
+      ]),
+    ]).toEqual([
+      ["2026-01-02", 5],
+      ["2026-01-04", 8],
+    ]);
+  });
+
+  it("accepts numeric Home Assistant statistic timestamps", () => {
+    expect([
+      ...statisticDailyDeltas([
+        { start: new Date("2026-01-01T00:00:00").getTime(), sum: 10 },
+        { start: new Date("2026-01-02T00:00:00").getTime(), sum: 13 },
+      ]),
+    ]).toEqual([["2026-01-02", 3]]);
+  });
+
+  it("supports direct and production-derived input models", () => {
+    const direct = dailyEnergyFromStatistics(config, {
+      "sensor.own": [
+        { start: "2026-01-01T00:00:00", sum: 1 },
+        { start: "2026-01-02T00:00:00", sum: 4 },
+      ],
+      "sensor.export": [
+        { start: "2026-01-01T00:00:00", sum: 2 },
+        { start: "2026-01-02T00:00:00", sum: 3 },
+      ],
+    });
+    expect(direct).toEqual([{ date: "2026-01-02", selfConsumption: 3, exported: 1 }]);
+    const derived = dailyEnergyFromStatistics(
+      {
+        ...config,
+        self_consumption_entity: undefined,
+        production_energy_entity: "sensor.production",
+      },
+      {
+        "sensor.production": [
+          { start: "2026-01-01T00:00:00", sum: 2 },
+          { start: "2026-01-02T00:00:00", sum: 7 },
+        ],
+        "sensor.export": [
+          { start: "2026-01-01T00:00:00", sum: 1 },
+          { start: "2026-01-02T00:00:00", sum: 3 },
+        ],
+      },
+    );
+    expect(derived).toEqual([{ date: "2026-01-02", selfConsumption: 3, exported: 2 }]);
+  });
+
+  it("deduplicates WebSocket requests and retains the fallback after failure", async () => {
+    const successConfig = {
+      ...config,
+      start_date: "2024-01-01",
+      annual_discount_rate: 3,
+      use_historical_statistics: true,
+    };
+    let calls = 0;
+    const hass = {
+      callWS: async () => {
+        calls += 1;
+        return {};
+      },
+    };
+    const first = loadHistoricalStatistics(hass, successConfig, new Date("2026-01-03T12:00:00"));
+    const second = loadHistoricalStatistics(hass, successConfig, new Date("2026-01-03T12:00:00"));
+    expect(first).toBe(second);
+    await first;
+    expect(calls).toBe(1);
+
+    let failures = 0;
+    const failingHass = {
+      callWS: async () => {
+        failures += 1;
+        return Promise.reject(new Error("recorder unavailable"));
+      },
+    };
+    const failed = loadHistoricalStatistics(
+      failingHass,
+      { ...successConfig, start_date: "2024-02-01" },
+      new Date("2026-01-03T12:00:00"),
+    );
+    expect(await failed).toBeUndefined();
+    expect(
+      await loadHistoricalStatistics(
+        failingHass,
+        { ...successConfig, start_date: "2024-02-01" },
+        new Date("2026-01-03T12:00:00"),
+      ),
+    ).toBeUndefined();
+    expect(failures).toBe(1);
+  });
+
+  it("requests a comparison day and includes the last completed day", async () => {
+    const requests: Record<string, unknown>[] = [];
+    await loadHistoricalStatistics(
+      {
+        callWS: async (request) => {
+          requests.push(request);
+          return {};
+        },
+      },
+      {
+        ...config,
+        start_date: "2026-05-02",
+        annual_discount_rate: 3,
+        use_historical_statistics: true,
+      },
+      new Date("2026-05-05T12:00:00"),
+    );
+    expect(requests).toEqual([
+      {
+        type: "recorder/statistics_during_period",
+        start_time: "2026-05-01T00:00:00",
+        end_time: "2026-05-05T00:00:00",
+        statistic_ids: ["sensor.own", "sensor.export"],
+        period: "day",
+        types: ["sum"],
+      },
+    ]);
   });
 });
 
@@ -219,6 +485,18 @@ describe("configuration editor", () => {
     ).toBe("2026-01-01");
   });
 
+  it("disables location seasonality by default", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+
+    expect(
+      (editor.shadowRoot?.querySelector('[name="use_location_seasonality"]') as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+  });
+
   it("passes the configured entity values to each picker", async () => {
     const editor = await createEditor();
 
@@ -250,7 +528,7 @@ describe("configuration editor", () => {
       "PV production energy entity",
       "Export energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(12);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(15);
   });
 
   it("emits the complete configuration after an entity changes", async () => {

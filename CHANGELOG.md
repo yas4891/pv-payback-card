@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-08-29
+
+- Added an optional location-aware seasonal payback forecast using the configured Home Assistant location.
+- Added an optional annual discount rate for benefit, contribution, progress, and payback calculations.
+- Added optional daily recorder statistics for placing discounted historical cashflows on their actual days.
+- Added shared statistics and calculation caches to reduce Home Assistant and browser load.
+- Added automatic approximation fallbacks when location data or recorder statistics are unavailable.
+- Added visual-editor controls and README guidance for every new forecasting option.
+
 ## 0.2.1 - 2026-08-29
 
 - Replaced the cached-data notice with a yellow warning icon beside the payback percentage.
