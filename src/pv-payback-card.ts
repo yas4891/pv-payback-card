@@ -545,6 +545,19 @@ export class PVPaybackCard extends LitElement {
       .filter(Boolean)
       .sort()
       .at(0);
+    const cacheWarning = cached
+      ? `${t.cached}${
+          cacheTime
+            ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, {
+                dateStyle: "short",
+                timeStyle: "short",
+              }).format(new Date(cacheTime))}`
+            : ""
+        }${sourceReadings
+          .filter((reading) => reading.warning)
+          .map((reading) => ` ${reading.warning}`)
+          .join("")}`
+      : undefined;
     const ownContribution = Math.min(
       100,
       Math.max(0, (calc.ownValue / config.investment_cost) * 100),
@@ -560,11 +573,24 @@ export class PVPaybackCard extends LitElement {
             <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
             ><span>${displayName(config.name, t.title)}</span>
           </div>
-          ${
-            config.show_progress
-              ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
-              : nothing
-          }
+          <div class="header-meta">
+            ${
+              cacheWarning
+                ? html`<span
+                    class="warning-indicator"
+                    role="img"
+                    aria-label=${cacheWarning}
+                    title=${cacheWarning}
+                    ><ha-icon icon="mdi:alert"></ha-icon
+                  ></span>`
+                : nothing
+            }
+            ${
+              config.show_progress
+                ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
+                : nothing
+            }
+          </div>
         </div>
         <div class="benefit">
           <span>${t.benefit}</span><strong>${this.formatMoney(calc.benefit)}</strong>
@@ -648,7 +674,6 @@ export class PVPaybackCard extends LitElement {
             : nothing
         }
         ${config.show_payback_date ? html`<div class="date"><span>${t.expected}</span><b>${calc.paybackDate ? new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "medium" }).format(calc.paybackDate) : t.noProjection}</b></div>` : nothing}
-        ${cached ? html`<div class="notice" role="status" aria-live="polite">${t.cached}${cacheTime ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "short", timeStyle: "short" }).format(new Date(cacheTime))}` : ""}${sourceReadings.map((reading) => (reading.warning ? html`<br />${reading.warning}` : nothing))}</div>` : nothing}
       </div>
     </ha-card>`;
   }
@@ -674,12 +699,25 @@ export class PVPaybackCard extends LitElement {
       gap: 10px;
       min-width: 0;
     }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .header-progress {
       color: var(--primary-color);
+      font-size: 1.545em;
       white-space: nowrap;
     }
     ha-icon {
       color: var(--primary-color);
+    }
+    .warning-indicator {
+      display: inline-flex;
+      color: var(--warning-color, #ff9800);
+    }
+    .warning-indicator ha-icon {
+      color: inherit;
     }
     .benefit {
       display: flex;
@@ -770,7 +808,6 @@ export class PVPaybackCard extends LitElement {
     .date b {
       text-align: end;
     }
-    .notice,
     .error {
       margin-top: 16px;
       color: var(--warning-color);

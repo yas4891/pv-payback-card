@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-08-29
+
+- Replaced the cached-data notice with a yellow warning icon beside the payback percentage.
+- Added a hover tooltip with the cached-data timestamp and warning details.
+- Increased the payback percentage to match the benefit value size.
+- Added card screenshots and linked the multi-inverter helper guide from the README.
+
 ## 0.2.0 - 2026-08-28
 
 - Added an optional production-energy input that calculates self-consumption from production minus export.

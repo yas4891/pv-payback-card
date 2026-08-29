@@ -10,6 +10,16 @@ The card calculates the financial benefit directly in the browser. It needs no c
 
 The card accepts `Wh`, `kWh`, and `MWh` sensors. It also preserves the latest valid reading during a temporary overnight `unknown` or `unavailable` state.
 
+## Screenshots
+
+### Standard progress bar
+
+![PV Payback Card with the standard blue-to-green progress bar](docs/images/pv-payback-card-standard.png)
+
+### Separate self-consumption and export contributions
+
+![PV Payback Card with blue self-consumption and green export contributions](docs/images/pv-payback-card-contribution-segments.png)
+
 ## Features
 
 - Configurable start date, investment cost, electricity price, and feed-in tariff.
@@ -79,9 +89,7 @@ Alternatively, configure `self_consumption_entity` and `export_energy_entity`. A
 
 ### Combining several energy sources
 
-Each input value accepts one entity only. Create a Home Assistant helper first when your installation combines several meters or sources.
-
-See the [Home Assistant helper documentation](https://www.home-assistant.io/integrations/#helper) and the [Template integration documentation](https://www.home-assistant.io/integrations/template/) for suitable helpers.
+See [Combining production from multiple inverters](https://github.com/yas4891/pv-payback-card/wiki/Combining-production-from-multiple-inverters) for a generic Template helper workflow and a concrete two-inverter example.
 
 ## Configuration options
 
