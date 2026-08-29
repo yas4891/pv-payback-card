@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.3 - 2026-08-29
+
+- Added negative baseline values for carrying energy forward after counter replacements.
+- Added a meter-replacement guide with formulas and practical examples to the project wiki.
+- Increased the scenario dialog borders for clearer visual separation.
+
 ## 0.3.2 - 2026-08-29
 
 - Renamed the discount toggle to `apply_annual_discount` while preserving existing configurations.

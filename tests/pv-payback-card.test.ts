@@ -298,6 +298,32 @@ describe("production-based self-consumption", () => {
     expect(result.exported).toBe(500);
   });
 
+  it("carries production from a replaced counter through a negative baseline", () => {
+    const result = calculatePayback(
+      { ...productionConfig, production_energy_baseline: -20_000 },
+      650,
+      100,
+    );
+
+    expect(result.selfConsumption).toBe(20_550);
+    expect(result.exported).toBe(100);
+  });
+
+  it("carries direct self-consumption through a negative baseline", () => {
+    const result = calculatePayback(
+      {
+        ...config,
+        self_consumption_baseline: -20_000,
+        export_energy_baseline: -5_000,
+      },
+      650,
+      100,
+    );
+
+    expect(result.selfConsumption).toBe(20_650);
+    expect(result.exported).toBe(5_100);
+  });
+
   it("uses a separate cache scope for production-based input", () => {
     expect(cacheKey(config, config.export_energy_entity)).not.toBe(
       cacheKey(productionConfig, productionConfig.export_energy_entity),

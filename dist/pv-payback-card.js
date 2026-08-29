@@ -913,7 +913,7 @@ function _t(s) {
     "export_energy_baseline"
   ]) {
     const t = s[e];
-    if (t !== void 0 && (!Number.isFinite(t) || t < 0)) return e;
+    if (t !== void 0 && !Number.isFinite(t)) return e;
   }
   if (!Number.isFinite(s.annual_discount_rate ?? 0) || (s.annual_discount_rate ?? 0) < 0)
     return "annual_discount_rate";
@@ -1528,7 +1528,7 @@ class gt extends P {
     .scenario {
       --scenario-color: var(--secondary-text-color, #727272);
       padding: 14px;
-      border: 1px solid var(--scenario-color);
+      border: 2px solid var(--scenario-color);
       background: var(--secondary-background-color);
       background: color-mix(in srgb, var(--scenario-color) 12%, var(--card-background-color, #fff));
       border-radius: 12px;

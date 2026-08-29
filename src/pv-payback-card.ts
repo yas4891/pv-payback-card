@@ -706,7 +706,7 @@ function validConfig(config: PVPaybackCardConfig): string | undefined {
     "export_energy_baseline",
   ] as const) {
     const value = config[key];
-    if (value !== undefined && (!Number.isFinite(value) || value < 0)) return key;
+    if (value !== undefined && !Number.isFinite(value)) return key;
   }
   if (!Number.isFinite(config.annual_discount_rate ?? 0) || (config.annual_discount_rate ?? 0) < 0)
     return "annual_discount_rate";
@@ -1540,7 +1540,7 @@ export class PVPaybackCard extends LitElement {
     .scenario {
       --scenario-color: var(--secondary-text-color, #727272);
       padding: 14px;
-      border: 1px solid var(--scenario-color);
+      border: 2px solid var(--scenario-color);
       background: var(--secondary-background-color);
       background: color-mix(in srgb, var(--scenario-color) 12%, var(--card-background-color, #fff));
       border-radius: 12px;
