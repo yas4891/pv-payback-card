@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-08-29
+
+- Added a localized scenario comparison dialog for the displayed benefit and estimated payback date.
+- Added linear, seasonal, and seasonally discounted values to every scenario comparison.
+- Added a clearly marked 3% comparison rate when no annual discount rate is configured.
+- Kept the main card nominal until an annual discount rate is explicitly configured.
+
 ## 0.3.0 - 2026-08-29
 
 - Added an optional location-aware seasonal payback forecast using the configured Home Assistant location.

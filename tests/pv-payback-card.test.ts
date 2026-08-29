@@ -4,6 +4,7 @@ import {
   PVPaybackCard,
   cacheKey,
   calculatePayback,
+  calculateScenarioComparisons,
   calculateSeasonalPaybackDate,
   chooseEnergyValue,
   dailyEnergyFromStatistics,
@@ -198,6 +199,40 @@ describe("calculateSeasonalPaybackDate", () => {
     expect(northern).toBeDefined();
     expect(southern).toBeDefined();
     expect(northern!.getTime()).toBeLessThan(southern!.getTime());
+  });
+});
+
+describe("scenario comparison", () => {
+  it("calculates every scenario independently from the selected card options", () => {
+    const scenarios = calculateScenarioComparisons(
+      {
+        ...config,
+        use_location_seasonality: false,
+        annual_discount_rate: 5,
+        use_historical_statistics: false,
+      },
+      10_000,
+      5_000,
+      new Date("2028-01-01T00:00:00"),
+      { latitude: 52.52, longitude: 13.405 },
+    );
+
+    expect(scenarios.linear.benefit).toBe(scenarios.seasonal.benefit);
+    expect(scenarios.linear.paybackDate?.getTime()).not.toBe(
+      scenarios.seasonal.paybackDate?.getTime(),
+    );
+    expect(scenarios.discounted.benefit).toBeLessThan(scenarios.seasonal.benefit);
+  });
+
+  it("uses three percent for the comparison when no discount rate is configured", () => {
+    const now = new Date("2028-01-01T00:00:00");
+    const scenarios = calculateScenarioComparisons(config, 10_000, 5_000, now, {
+      latitude: 52.52,
+      longitude: 13.405,
+    });
+
+    expect(scenarios.discounted.benefit).toBeLessThan(scenarios.seasonal.benefit);
+    expect(calculatePayback(config, 10_000, 5_000, now).benefit).toBe(scenarios.seasonal.benefit);
   });
 });
 
@@ -455,6 +490,74 @@ describe("last valid energy cache", () => {
     expect(cacheKey(config, config.self_consumption_entity!)).not.toBe(
       cacheKey(changed, changed.self_consumption_entity!),
     );
+  });
+});
+
+describe("scenario dialog", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  async function createCard(language: "de" | "en" = "en"): Promise<PVPaybackCard> {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "10000", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "5000", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language },
+      config: { currency: "EUR", latitude: 52.52, longitude: 13.405 },
+    };
+    card.setConfig({ ...config, annual_discount_rate: 5 });
+    document.body.append(card);
+    await card.updateComplete;
+    return card;
+  }
+
+  it("opens the English comparison from the benefit value", async () => {
+    const card = await createCard();
+
+    (card.shadowRoot?.querySelector(".benefit strong") as HTMLElement).click();
+    await card.updateComplete;
+
+    const dialog = card.shadowRoot?.querySelector("ha-dialog") as HTMLElement & {
+      heading?: string;
+      open?: boolean;
+    };
+    expect(dialog.open).toBe(true);
+    expect(dialog.heading).toBe("Payback scenarios");
+    expect(dialog.textContent).toContain("Linear only");
+    expect(dialog.textContent).toContain("With seasonality");
+    expect(dialog.textContent).toContain("With seasonality and discounting");
+    expect(dialog.textContent).toContain("Discount rate: 5%");
+  });
+
+  it("opens the localized comparison from the payback date", async () => {
+    const card = await createCard("de");
+
+    (card.shadowRoot?.querySelector(".date b") as HTMLElement).click();
+    await card.updateComplete;
+
+    const dialog = card.shadowRoot?.querySelector("ha-dialog") as HTMLElement & {
+      heading?: string;
+    };
+    expect(dialog.heading).toBe("Amortisationsszenarien");
+    expect(dialog.textContent).toContain("Nur linear");
+    expect(dialog.textContent).toContain("Mit Saisonalität");
+    expect(dialog.textContent).toContain("Mit Saisonalität und Abzinsung");
+    expect(dialog.textContent).toMatch(/Abzinsungssatz: 5\s*%/);
+  });
+
+  it("labels the default comparison discount rate", async () => {
+    const card = await createCard();
+    card.setConfig(config);
+    await card.updateComplete;
+
+    (card.shadowRoot?.querySelector(".benefit strong") as HTMLElement).click();
+    await card.updateComplete;
+
+    const text = card.shadowRoot?.querySelector("ha-dialog")?.textContent?.replace(/\s+/g, " ");
+    expect(text).toContain("Discount rate: 3% (default)");
   });
 });
 

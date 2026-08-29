@@ -52,6 +52,12 @@ type Calculation = {
   warning?: string;
 };
 
+export type ScenarioCalculations = {
+  linear: Calculation;
+  seasonal: Calculation;
+  discounted: Calculation;
+};
+
 const DAYS_PER_YEAR = 365.2425;
 const MAXIMUM_FORECAST_DAYS = 366 * 50;
 const historicalStatisticsCache = new Map<string, Promise<HistoricalStatistics | undefined>>();
@@ -72,6 +78,16 @@ const translations = {
     counterRegression:
       "Zählerstand ist niedriger als der zuletzt gültige Wert. Gespeicherter Wert wird weiter verwendet.",
     invalid: "Ungültige Konfiguration",
+    scenariosTitle: "Amortisationsszenarien",
+    scenariosOpen: "Amortisationsszenarien öffnen",
+    scenarioLinear: "Nur linear",
+    scenarioSeasonal: "Mit Saisonalität",
+    scenarioDiscounted: "Mit Saisonalität und Abzinsung",
+    discountRate: "Abzinsungssatz",
+    defaultRate: "Standardwert",
+    locationFallback:
+      "Der Home-Assistant-Standort fehlt. Die saisonalen Szenarien verwenden deshalb die lineare Prognose.",
+    close: "Schließen",
   },
   en: {
     title: "PV payback",
@@ -88,6 +104,16 @@ const translations = {
     counterRegression:
       "Counter value is lower than the last valid value. The saved value remains in use.",
     invalid: "Invalid configuration",
+    scenariosTitle: "Payback scenarios",
+    scenariosOpen: "Open payback scenarios",
+    scenarioLinear: "Linear only",
+    scenarioSeasonal: "With seasonality",
+    scenarioDiscounted: "With seasonality and discounting",
+    discountRate: "Discount rate",
+    defaultRate: "default",
+    locationFallback:
+      "The Home Assistant location is unavailable. The seasonal scenarios therefore use the linear forecast.",
+    close: "Close",
   },
 } as const;
 
@@ -549,6 +575,49 @@ export function calculatePayback(
   };
 }
 
+/** Calculates all comparison scenarios independently from the card's display options. */
+export function calculateScenarioComparisons(
+  config: PVPaybackCardConfig,
+  selfConsumption: number,
+  exported: number,
+  now = new Date(),
+  location?: { latitude?: number; longitude?: number },
+  historicalDays?: DailyEnergy[],
+  comparisonDiscountRate = config.annual_discount_rate ?? 3,
+): ScenarioCalculations {
+  const base = { ...config, use_historical_statistics: false };
+  return {
+    linear: calculatePayback(
+      { ...base, use_location_seasonality: false, annual_discount_rate: 0 },
+      selfConsumption,
+      exported,
+      now,
+      location,
+      historicalDays,
+    ),
+    seasonal: calculatePayback(
+      { ...base, use_location_seasonality: true, annual_discount_rate: 0 },
+      selfConsumption,
+      exported,
+      now,
+      location,
+      historicalDays,
+    ),
+    discounted: calculatePayback(
+      {
+        ...base,
+        use_location_seasonality: true,
+        annual_discount_rate: comparisonDiscountRate,
+      },
+      selfConsumption,
+      exported,
+      now,
+      location,
+      historicalDays,
+    ),
+  };
+}
+
 export function cacheKey(config: PVPaybackCardConfig, entity: string): string {
   const directSelfConsumption = Boolean(config.self_consumption_entity);
   const scope = JSON.stringify([
@@ -782,9 +851,19 @@ export class PVPaybackCardEditor extends LitElement {
 customElements.define("pv-payback-card-editor", PVPaybackCardEditor);
 
 export class PVPaybackCard extends LitElement {
-  static properties = { hass: { attribute: false }, _config: { state: true } };
+  static properties = {
+    hass: { attribute: false },
+    _config: { state: true },
+    _scenarioDialogOpen: { state: true },
+  };
   declare hass?: HomeAssistant;
   declare _config?: PVPaybackCardConfig;
+  declare _scenarioDialogOpen: boolean;
+
+  constructor() {
+    super();
+    this._scenarioDialogOpen = false;
+  }
 
   static getStubConfig(): Partial<PVPaybackCardConfig> {
     return {
@@ -806,15 +885,21 @@ export class PVPaybackCard extends LitElement {
   }
 
   setConfig(config: PVPaybackCardConfig): void {
+    this._comparisonDiscountRate = config.annual_discount_rate ?? 3;
+    this._comparisonUsesDefaultRate = config.annual_discount_rate === undefined;
     this._config = withDisplayDefaults(config);
     this._historicalStatistics = undefined;
     this._historicalStatisticsKey = undefined;
     this._calculationCache = undefined;
+    this._scenarioCalculationCache = undefined;
   }
 
   private _historicalStatistics?: HistoricalStatistics;
   private _historicalStatisticsKey?: string;
   private _calculationCache?: { key: string; calculation: Calculation };
+  private _scenarioCalculationCache?: { key: string; scenarios: ScenarioCalculations };
+  private _comparisonDiscountRate = 3;
+  private _comparisonUsesDefaultRate = true;
 
   protected updated(): void {
     const config = this._config;
@@ -903,6 +988,80 @@ export class PVPaybackCard extends LitElement {
     );
   }
 
+  private formatDate(date: Date | undefined): string {
+    return date
+      ? new Intl.DateTimeFormat(this._config?.locale ?? this.hass?.locale?.language, {
+          dateStyle: "medium",
+        }).format(date)
+      : this.text().noProjection;
+  }
+
+  private formatPercentage(value: number): string {
+    return new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
+      style: "percent",
+      maximumFractionDigits: 2,
+    }).format(value / 100);
+  }
+
+  private openScenarioDialog(): void {
+    this._scenarioDialogOpen = true;
+  }
+
+  private closeScenarioDialog(): void {
+    this._scenarioDialogOpen = false;
+  }
+
+  private handleScenarioKeydown(event: KeyboardEvent): void {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    this.openScenarioDialog();
+  }
+
+  private renderScenarioDialog(
+    scenarios: ScenarioCalculations,
+    locationValid: boolean,
+  ): TemplateResult {
+    const t = this.text();
+    const rows = [
+      [t.scenarioLinear, scenarios.linear],
+      [t.scenarioSeasonal, scenarios.seasonal],
+      [t.scenarioDiscounted, scenarios.discounted],
+    ] as const;
+    return html`<ha-dialog
+      .open=${this._scenarioDialogOpen}
+      .heading=${t.scenariosTitle}
+      @closed=${this.closeScenarioDialog}
+    >
+      <div class="scenario-dialog">
+        ${!locationValid ? html`<p class="scenario-note">${t.locationFallback}</p>` : nothing}
+        ${rows.map(
+          ([name, scenario], index) =>
+            html`<section class="scenario">
+              <h3>${name}</h3>
+              ${
+                index === 2
+                  ? html`<div class="scenario-rate">
+                      ${t.discountRate}: ${this.formatPercentage(this._comparisonDiscountRate)}
+                      ${this._comparisonUsesDefaultRate ? html`(${t.defaultRate})` : nothing}
+                    </div>`
+                  : nothing
+              }
+              <div class="scenario-values">
+                <div>
+                  <span>${t.benefit}</span><strong>${this.formatMoney(scenario.benefit)}</strong>
+                </div>
+                <div>
+                  <span>${t.expected}</span
+                  ><strong>${this.formatDate(scenario.paybackDate)}</strong>
+                </div>
+              </div>
+            </section>`,
+        )}
+      </div>
+      <ha-button slot="primaryAction" @click=${this.closeScenarioDialog}>${t.close}</ha-button>
+    </ha-dialog>`;
+  }
+
   private openMoreInfo(entityId: string): void {
     this.dispatchEvent(
       new CustomEvent("hass-more-info", {
@@ -985,6 +1144,25 @@ export class PVPaybackCard extends LitElement {
       };
     }
     const calc = this._calculationCache.calculation;
+    let scenarios: ScenarioCalculations | undefined;
+    if (this._scenarioDialogOpen) {
+      const scenarioCalculationKey = `${calculationKey}:${this._comparisonDiscountRate}`;
+      if (this._scenarioCalculationCache?.key !== scenarioCalculationKey) {
+        this._scenarioCalculationCache = {
+          key: scenarioCalculationKey,
+          scenarios: calculateScenarioComparisons(
+            config,
+            selfConsumption,
+            exportedValue,
+            now,
+            location,
+            dailyEnergyFromStatistics(config, this._historicalStatistics),
+            this._comparisonDiscountRate,
+          ),
+        };
+      }
+      scenarios = this._scenarioCalculationCache.scenarios;
+    }
     const cached = sourceReadings.some((reading) => reading.cached);
     const cacheTime = sourceReadings
       .map((reading) => reading.timestamp)
@@ -1013,115 +1191,150 @@ export class PVPaybackCard extends LitElement {
       Math.max(0, (calc.exportValue / config.investment_cost) * 100),
     );
     return html`<ha-card>
-      <div class="content">
-        <div class="header">
-          <div class="header-title">
-            <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
-            ><span>${displayName(config.name, t.title)}</span>
+        <div class="content">
+          <div class="header">
+            <div class="header-title">
+              <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
+              ><span>${displayName(config.name, t.title)}</span>
+            </div>
+            <div class="header-meta">
+              ${
+                cacheWarning
+                  ? html`<span
+                      class="warning-indicator"
+                      role="img"
+                      aria-label=${cacheWarning}
+                      title=${cacheWarning}
+                      ><ha-icon icon="mdi:alert"></ha-icon
+                    ></span>`
+                  : nothing
+              }
+              ${
+                config.show_progress
+                  ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
+                  : nothing
+              }
+            </div>
           </div>
-          <div class="header-meta">
-            ${
-              cacheWarning
-                ? html`<span
-                    class="warning-indicator"
-                    role="img"
-                    aria-label=${cacheWarning}
-                    title=${cacheWarning}
-                    ><ha-icon icon="mdi:alert"></ha-icon
-                  ></span>`
-                : nothing
-            }
-            ${
-              config.show_progress
-                ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
-                : nothing
-            }
+          <div class="benefit">
+            <span>${t.benefit}</span
+            ><strong
+              class="scenario-trigger"
+              role="button"
+              tabindex="0"
+              aria-label=${`${t.scenariosOpen}: ${t.benefit}`}
+              @click=${this.openScenarioDialog}
+              @keydown=${this.handleScenarioKeydown}
+              >${this.formatMoney(calc.benefit)}</strong
+            >
           </div>
-        </div>
-        <div class="benefit">
-          <span>${t.benefit}</span><strong>${this.formatMoney(calc.benefit)}</strong>
-        </div>
-        ${
-          config.show_progress
-            ? html`<div
-                class="bar ${config.show_contribution_segments ? "contribution-segments" : ""}"
-                role="progressbar"
-                aria-label=${t.progress}
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow=${calc.progress}
-              >
-                ${
-                  config.show_contribution_segments
-                    ? html`<div class="contribution-own" style=${`width:${ownContribution}%`}></div>
-                        <div
-                          class="contribution-export"
-                          style=${`width:${exportContribution}%`}
-                        ></div>`
-                    : html`<div style=${`width:${calc.progress}%`}></div>`
-                }
-              </div>`
-            : nothing
-        }
-        ${
-          config.show_breakdown && (config.show_energy_values || config.show_money_values)
-            ? html`<div
-                class="breakdown ${config.show_contribution_segments ? "contribution-segments" : ""}"
-              >
-                <div
-                  class="own"
-                  role=${config.self_consumption_entity ? "button" : nothing}
-                  tabindex=${config.self_consumption_entity ? "0" : nothing}
-                  aria-label=${config.self_consumption_entity ? t.own : nothing}
-                  @click=${
-                    config.self_consumption_entity
-                      ? () => this.openMoreInfo(config.self_consumption_entity!)
-                      : nothing
-                  }
-                  @keydown=${
-                    config.self_consumption_entity
-                      ? (event: KeyboardEvent) =>
-                          this.handleBreakdownKeydown(event, config.self_consumption_entity!)
-                      : nothing
-                  }
+          ${
+            config.show_progress
+              ? html`<div
+                  class="bar ${config.show_contribution_segments ? "contribution-segments" : ""}"
+                  role="progressbar"
+                  aria-label=${t.progress}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow=${calc.progress}
                 >
-                  <span>${t.own}</span
-                  ><b
-                    >${
-                      config.show_energy_values && config.show_money_values
-                        ? `${this.formatEnergy(calc.selfConsumption)} · ${this.formatMoney(calc.ownValue)}`
-                        : config.show_energy_values
-                          ? this.formatEnergy(calc.selfConsumption)
-                          : this.formatMoney(calc.ownValue)
-                    }</b
-                  >
-                </div>
-                <div
-                  class="export"
-                  role="button"
-                  tabindex="0"
-                  aria-label=${t.export}
-                  @click=${() => this.openMoreInfo(config.export_energy_entity)}
-                  @keydown=${(event: KeyboardEvent) =>
-                    this.handleBreakdownKeydown(event, config.export_energy_entity)}
+                  ${
+                    config.show_contribution_segments
+                      ? html`<div
+                            class="contribution-own"
+                            style=${`width:${ownContribution}%`}
+                          ></div>
+                          <div
+                            class="contribution-export"
+                            style=${`width:${exportContribution}%`}
+                          ></div>`
+                      : html`<div style=${`width:${calc.progress}%`}></div>`
+                  }
+                </div>`
+              : nothing
+          }
+          ${
+            config.show_breakdown && (config.show_energy_values || config.show_money_values)
+              ? html`<div
+                  class="breakdown ${config.show_contribution_segments ? "contribution-segments" : ""}"
                 >
-                  <span>${t.export}</span
-                  ><b
-                    >${
-                      config.show_energy_values && config.show_money_values
-                        ? `${this.formatEnergy(calc.exported)} · ${this.formatMoney(calc.exportValue)}`
-                        : config.show_energy_values
-                          ? this.formatEnergy(calc.exported)
-                          : this.formatMoney(calc.exportValue)
-                    }</b
+                  <div
+                    class="own"
+                    role=${config.self_consumption_entity ? "button" : nothing}
+                    tabindex=${config.self_consumption_entity ? "0" : nothing}
+                    aria-label=${config.self_consumption_entity ? t.own : nothing}
+                    @click=${
+                      config.self_consumption_entity
+                        ? () => this.openMoreInfo(config.self_consumption_entity!)
+                        : nothing
+                    }
+                    @keydown=${
+                      config.self_consumption_entity
+                        ? (event: KeyboardEvent) =>
+                            this.handleBreakdownKeydown(event, config.self_consumption_entity!)
+                        : nothing
+                    }
                   >
-                </div>
-              </div>`
-            : nothing
-        }
-        ${config.show_payback_date ? html`<div class="date"><span>${t.expected}</span><b>${calc.paybackDate ? new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, { dateStyle: "medium" }).format(calc.paybackDate) : t.noProjection}</b></div>` : nothing}
-      </div>
-    </ha-card>`;
+                    <span>${t.own}</span
+                    ><b
+                      >${
+                        config.show_energy_values && config.show_money_values
+                          ? `${this.formatEnergy(calc.selfConsumption)} · ${this.formatMoney(calc.ownValue)}`
+                          : config.show_energy_values
+                            ? this.formatEnergy(calc.selfConsumption)
+                            : this.formatMoney(calc.ownValue)
+                      }</b
+                    >
+                  </div>
+                  <div
+                    class="export"
+                    role="button"
+                    tabindex="0"
+                    aria-label=${t.export}
+                    @click=${() => this.openMoreInfo(config.export_energy_entity)}
+                    @keydown=${(event: KeyboardEvent) =>
+                      this.handleBreakdownKeydown(event, config.export_energy_entity)}
+                  >
+                    <span>${t.export}</span
+                    ><b
+                      >${
+                        config.show_energy_values && config.show_money_values
+                          ? `${this.formatEnergy(calc.exported)} · ${this.formatMoney(calc.exportValue)}`
+                          : config.show_energy_values
+                            ? this.formatEnergy(calc.exported)
+                            : this.formatMoney(calc.exportValue)
+                      }</b
+                    >
+                  </div>
+                </div>`
+              : nothing
+          }
+          ${
+            config.show_payback_date
+              ? html`<div class="date">
+                  <span>${t.expected}</span
+                  ><b
+                    class="scenario-trigger"
+                    role="button"
+                    tabindex="0"
+                    aria-label=${`${t.scenariosOpen}: ${t.expected}`}
+                    @click=${this.openScenarioDialog}
+                    @keydown=${this.handleScenarioKeydown}
+                    >${this.formatDate(calc.paybackDate)}</b
+                  >
+                </div>`
+              : nothing
+          }
+        </div>
+      </ha-card>
+      ${
+        this._scenarioDialogOpen && scenarios
+          ? this.renderScenarioDialog(
+              scenarios,
+              validLocation(location.latitude, location.longitude),
+            )
+          : nothing
+      }`;
   }
 
   static styles = css`
@@ -1173,6 +1386,14 @@ export class PVPaybackCard extends LitElement {
     }
     .benefit strong {
       font-size: 1.7em;
+    }
+    .scenario-trigger {
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .scenario-trigger:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 4px;
     }
     .date {
       display: flex;
@@ -1259,6 +1480,45 @@ export class PVPaybackCard extends LitElement {
       color: var(--warning-color);
       font-size: 0.88em;
     }
+    .scenario-dialog {
+      display: grid;
+      gap: 12px;
+      min-width: min(520px, 75vw);
+      padding-bottom: 8px;
+    }
+    .scenario {
+      padding: 14px;
+      background: var(--secondary-background-color);
+      border-radius: 12px;
+    }
+    .scenario h3 {
+      margin: 0 0 10px;
+      font-size: 1em;
+    }
+    .scenario-rate,
+    .scenario-note,
+    .scenario-values span {
+      color: var(--secondary-text-color);
+    }
+    .scenario-note {
+      margin: 0;
+    }
+    .scenario-rate {
+      margin: -4px 0 10px;
+      font-size: 0.88em;
+    }
+    .scenario-values {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .scenario-values div {
+      display: grid;
+      gap: 4px;
+    }
+    .scenario-values strong:last-child {
+      text-align: end;
+    }
     @media (max-width: 360px) {
       .breakdown {
         grid-template-columns: 1fr;
@@ -1270,6 +1530,15 @@ export class PVPaybackCard extends LitElement {
         gap: 4px;
       }
       .date b {
+        text-align: start;
+      }
+      .scenario-dialog {
+        min-width: 0;
+      }
+      .scenario-values {
+        grid-template-columns: 1fr;
+      }
+      .scenario-values strong:last-child {
         text-align: start;
       }
     }

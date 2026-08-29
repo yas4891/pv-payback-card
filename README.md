@@ -29,6 +29,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It also preserves the latest va
 - Optional baseline values for counters that started before the accounting period.
 - Optional energy and monetary values in the detailed breakdown.
 - Optional blue and green contribution segments with clickable source-entity details.
+- Clickable benefit and payback values with a localized comparison of linear, seasonal, and discounted scenarios.
 - Cached last valid readings and visible warnings for unavailable or decreasing counters.
 - Localized German and English output.
 - Responsive layout for desktop and mobile dashboards.
@@ -130,6 +131,8 @@ The card calculates the benefit as self-consumed energy times `electricity_price
 When `use_location_seasonality` is `true`, the card estimates daily solar potential from the Home Assistant latitude. It converts observed benefit per accumulated solar potential into future daily benefit. This calculation runs locally and makes no network requests. The card uses the linear forecast when the option is disabled, coordinates are unavailable or invalid, or a seasonal result cannot be calculated.
 
 Set `annual_discount_rate` as a percentage, not a fraction. The card discounts each daily cashflow from `start_date` using 365.2425 days per year. A positive rate can delay payback. It can also make payback impossible within the forecast limit.
+
+Click the displayed benefit or estimated payback date to open the scenario comparison. The dialog always shows a linear forecast, a seasonal forecast, and a seasonal forecast using `annual_discount_rate`. When `annual_discount_rate` is not configured, only the comparison dialog uses a clearly marked default rate of 3%. The main card remains nominal until the parameter is configured. These comparisons remain available when the corresponding display options are disabled. Without a valid Home Assistant location, the seasonal rows transparently fall back to the linear forecast.
 
 With `use_historical_statistics: true`, the card requests only daily `sum` statistics through Home Assistant's recorder WebSocket API. It never requests raw history. The browser shares one successful or failed request per source, start date, and completed end date during its session. The card renders immediately with an even daily approximation. It updates once when recorder data arrives. Missing statistics, an unavailable recorder, or a failed request keep the approximation active. Recorder retention and enabled statistics can limit available historical days.
 
