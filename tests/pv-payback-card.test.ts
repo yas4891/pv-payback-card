@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   PVPaybackCardEditor,
   PVPaybackCard,
+  appliesAnnualDiscount,
   cacheKey,
   calculatePayback,
   calculateScenarioComparisons,
@@ -74,7 +75,12 @@ describe("calculatePayback", () => {
   it("keeps nominal results exactly when the discount rate is zero", () => {
     const now = new Date("2026-03-01T00:00:00");
     const nominal = calculatePayback(config, 1100, 550, now);
-    const zeroRate = calculatePayback({ ...config, annual_discount_rate: 0 }, 1100, 550, now);
+    const zeroRate = calculatePayback(
+      { ...config, annual_discount_rate: 0, apply_annual_discount: true },
+      1100,
+      550,
+      now,
+    );
     expect(zeroRate).toEqual(nominal);
   });
 
@@ -82,7 +88,7 @@ describe("calculatePayback", () => {
     const now = new Date("2030-01-01T00:00:00");
     const nominal = calculatePayback(config, 20_000, 10_000, now);
     const discounted = calculatePayback(
-      { ...config, annual_discount_rate: 10 },
+      { ...config, annual_discount_rate: 10, apply_annual_discount: true },
       20_000,
       10_000,
       now,
@@ -91,16 +97,39 @@ describe("calculatePayback", () => {
     expect(discounted.progress).toBeLessThan(nominal.progress);
   });
 
+  it("keeps the main calculation nominal until discounting is enabled", () => {
+    const now = new Date("2030-01-01T00:00:00");
+    const nominal = calculatePayback(config, 20_000, 10_000, now);
+    const disabled = calculatePayback(
+      { ...config, annual_discount_rate: 10, apply_annual_discount: false },
+      20_000,
+      10_000,
+      now,
+    );
+
+    expect(disabled).toEqual(nominal);
+  });
+
   it("delays or prevents a discounted payback date", () => {
     const now = new Date("2028-01-01T00:00:00");
     const nominal = calculatePayback(config, 10_000, 5_000, now);
-    const discounted = calculatePayback({ ...config, annual_discount_rate: 5 }, 10_000, 5_000, now);
+    const discounted = calculatePayback(
+      { ...config, annual_discount_rate: 5, apply_annual_discount: true },
+      10_000,
+      5_000,
+      now,
+    );
     expect(discounted.paybackDate).toBeDefined();
     expect(discounted.paybackDate!.getTime()).toBeGreaterThanOrEqual(
       nominal.paybackDate?.getTime() ?? 0,
     );
     const impossible = calculatePayback(
-      { ...config, annual_discount_rate: 100, investment_cost: 1_000_000 },
+      {
+        ...config,
+        annual_discount_rate: 100,
+        apply_annual_discount: true,
+        investment_cost: 1_000_000,
+      },
       10_000,
       5_000,
       now,
@@ -110,7 +139,12 @@ describe("calculatePayback", () => {
 
   it("keeps the complete discounted historical benefit after payback", () => {
     const result = calculatePayback(
-      { ...config, investment_cost: 100, annual_discount_rate: 5 },
+      {
+        ...config,
+        investment_cost: 100,
+        annual_discount_rate: 5,
+        apply_annual_discount: true,
+      },
       1000,
       500,
       new Date("2027-01-01T00:00:00"),
@@ -209,7 +243,7 @@ describe("scenario comparison", () => {
         ...config,
         use_location_seasonality: false,
         annual_discount_rate: 5,
-        use_historical_statistics: false,
+        apply_annual_discount: false,
       },
       10_000,
       5_000,
@@ -244,14 +278,38 @@ describe("production-based self-consumption", () => {
   };
 
   it("calculates self-consumption from production minus export", () => {
-    const result = calculatePayback(productionConfig, 1100 - 550, 550);
+    const result = calculatePayback(productionConfig, 1100, 550);
     expect(result.selfConsumption).toBe(550);
     expect(result.ownValue).toBe(165);
+  });
+
+  it("applies production and export baselines before deriving self-consumption", () => {
+    const result = calculatePayback(
+      {
+        ...productionConfig,
+        production_energy_baseline: 100,
+        export_energy_baseline: 50,
+      },
+      1100,
+      550,
+    );
+
+    expect(result.selfConsumption).toBe(500);
+    expect(result.exported).toBe(500);
   });
 
   it("uses a separate cache scope for production-based input", () => {
     expect(cacheKey(config, config.export_energy_entity)).not.toBe(
       cacheKey(productionConfig, productionConfig.export_energy_entity),
+    );
+  });
+
+  it("uses a separate cache scope when the production baseline changes", () => {
+    expect(cacheKey(productionConfig, productionConfig.production_energy_entity!)).not.toBe(
+      cacheKey(
+        { ...productionConfig, production_energy_baseline: 100 },
+        productionConfig.production_energy_entity!,
+      ),
     );
   });
 
@@ -311,7 +369,7 @@ describe("display configuration", () => {
       show_progress: true,
       use_location_seasonality: false,
       annual_discount_rate: 0,
-      use_historical_statistics: false,
+      apply_annual_discount: false,
     });
   });
 
@@ -319,6 +377,13 @@ describe("display configuration", () => {
     expect(
       withDisplayDefaults({ ...config, show_energy_values: false, show_money_values: false }),
     ).toMatchObject({ show_energy_values: false, show_money_values: false });
+  });
+
+  it("keeps the former statistics option as a compatibility alias", () => {
+    const legacy = { ...config, use_historical_statistics: true };
+
+    expect(appliesAnnualDiscount(legacy)).toBe(true);
+    expect(withDisplayDefaults(legacy).apply_annual_discount).toBe(true);
   });
 });
 
@@ -383,7 +448,7 @@ describe("historical daily statistics", () => {
       ...config,
       start_date: "2024-01-01",
       annual_discount_rate: 3,
-      use_historical_statistics: true,
+      apply_annual_discount: true,
     };
     let calls = 0;
     const hass = {
@@ -434,7 +499,7 @@ describe("historical daily statistics", () => {
         ...config,
         start_date: "2026-05-02",
         annual_discount_rate: 3,
-        use_historical_statistics: true,
+        apply_annual_discount: true,
       },
       new Date("2026-05-05T12:00:00"),
     );
@@ -530,6 +595,17 @@ describe("scenario dialog", () => {
     expect(dialog.textContent).toContain("With seasonality");
     expect(dialog.textContent).toContain("With seasonality and discounting");
     expect(dialog.textContent).toContain("Discount rate: 5%");
+    const scenarios = Array.from(dialog.querySelectorAll(".scenario"));
+    expect(scenarios.map((scenario) => scenario.className)).toEqual([
+      "scenario scenario-linear",
+      "scenario scenario-seasonal",
+      "scenario scenario-discounted",
+    ]);
+    expect(
+      scenarios.map(
+        (scenario) => (scenario.querySelector("ha-icon") as HTMLElement & { icon?: string }).icon,
+      ),
+    ).toEqual(["mdi:chart-line", "mdi:weather-sunny", "mdi:percent-circle-outline"]);
   });
 
   it("opens the localized comparison from the payback date", async () => {
@@ -615,6 +691,24 @@ describe("configuration editor", () => {
       "",
       config.export_energy_entity,
     ]);
+  });
+
+  it("shows the baseline for the selected energy input model", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+    expect(editor.shadowRoot?.querySelector('[name="self_consumption_baseline"]')).not.toBeNull();
+    expect(editor.shadowRoot?.querySelector('[name="production_energy_baseline"]')).toBeNull();
+
+    editor.setConfig({
+      ...config,
+      self_consumption_entity: undefined,
+      production_energy_entity: "sensor.production",
+    });
+    await editor.updateComplete;
+    expect(editor.shadowRoot?.querySelector('[name="self_consumption_baseline"]')).toBeNull();
+    expect(editor.shadowRoot?.querySelector('[name="production_energy_baseline"]')).not.toBeNull();
   });
 
   it("uses each entity label only inside its picker", async () => {

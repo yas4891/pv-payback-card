@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.3.2 - 2026-08-29
+
+- Renamed the discount toggle to `apply_annual_discount` while preserving existing configurations.
+- Added `production_energy_baseline` for production-based self-consumption calculations.
+- Added input-specific baseline fields to the visual editor.
+- Added category icons, colored borders, and matching pastel backgrounds to the scenario dialog.
+- Added a dedicated scenario comparison section to the README.
+
 ## 0.3.1 - 2026-08-29
 
 - Added a localized scenario comparison dialog for the displayed benefit and estimated payback date.

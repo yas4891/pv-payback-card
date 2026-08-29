@@ -34,6 +34,10 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It also preserves the latest va
 - Localized German and English output.
 - Responsive layout for desktop and mobile dashboards.
 
+### Scenario comparison
+
+Click the displayed benefit or estimated payback date to open the scenario comparison. The dialog always shows a linear forecast, a seasonal forecast, and a seasonal forecast using `annual_discount_rate`. When `annual_discount_rate` is not configured, only the comparison dialog uses a clearly marked default rate of 3%. The main card remains nominal until the parameter is configured. These comparisons remain available when the corresponding display options are disabled. Without a valid Home Assistant location, the seasonal rows transparently fall back to the linear forecast.
+
 ## Installation
 
 ### Via HACS
@@ -81,7 +85,7 @@ production_energy_entity: sensor.pv_production_total
 export_energy_entity: sensor.pv_export_total
 use_location_seasonality: true
 annual_discount_rate: 3.5
-use_historical_statistics: true
+apply_annual_discount: true
 ```
 
 The card calculates self-consumption as production minus export. The card uses cumulative energy values, not current power values.
@@ -109,6 +113,7 @@ See [Combining production from multiple inverters](https://github.com/yas4891/pv
 | `production_energy_entity`   | No       | —                         | Entity with total PV production energy. Configure this entity when no direct self-consumption entity exists. The card calculates self-consumption as production minus export. The entity must expose a cumulative numeric value in `Wh`, `kWh`, or `MWh`. Example: `sensor.pv_production_total`. |
 | `export_energy_entity`       | Yes      | —                         | Entity with total energy exported to the grid. The entity must expose a cumulative numeric value in `Wh`, `kWh`, or `MWh`. Example: `sensor.pv_export_total`.                                                                                                                                    |
 | `self_consumption_baseline`  | No       | `0`                       | Self-consumption counter reading at `start_date`, in `kWh`. Use it when the selected counter began before the accounting period. Example: `1250.4`.                                                                                                                                              |
+| `production_energy_baseline` | No       | `0`                       | Production counter reading at `start_date`, in `kWh`. Use it with `production_energy_entity` when that counter began before the accounting period. Example: `2081.1`.                                                                                                                            |
 | `export_energy_baseline`     | No       | `0`                       | Export counter reading at `start_date`, in `kWh`. Use it when the selected counter began before the accounting period. Example: `830.7`.                                                                                                                                                         |
 | `name`                       | No       | Localized title           | Card heading. Example: `"PV payback"`.                                                                                                                                                                                                                                                           |
 | `icon`                       | No       | `mdi:solar-power-variant` | Material Design icon in the card heading. Example: `mdi:solar-power-variant`.                                                                                                                                                                                                                    |
@@ -121,20 +126,18 @@ See [Combining production from multiple inverters](https://github.com/yas4891/pv
 | `show_progress`              | No       | `true`                    | Shows the percentage and progress bar. Set `false` when the financial value is sufficient.                                                                                                                                                                                                       |
 | `show_contribution_segments` | No       | `false`                   | Shows self-consumption as a blue segment and export as a green segment in the progress bar. The corresponding breakdown values use the same colors and open source details when clicked.                                                                                                         |
 | `use_location_seasonality`   | No       | `false`                   | Uses a local seasonal solar-potential forecast after valid Home Assistant coordinates confirm the location. The latitude determines the seasonal curve. The card uses the existing linear forecast when the location is missing or invalid.                                                      |
-| `annual_discount_rate`       | No       | `0`                       | Annual discount rate as a percentage. Example: `3.5` means 3.5% per year. `0` preserves the existing nominal calculation.                                                                                                                                                                        |
-| `use_historical_statistics`  | No       | `false`                   | Uses Home Assistant daily recorder statistics to place past discounted cashflows on their actual days. This option only applies with a positive `annual_discount_rate`.                                                                                                                          |
+| `annual_discount_rate`       | No       | `0`                       | Annual discount rate as a percentage. Example: `3.5` means 3.5% per year. The main card only uses this value when `apply_annual_discount` is `true`.                                                                                                                                             |
+| `apply_annual_discount`      | No       | `false`                   | Applies `annual_discount_rate` to benefit, contribution, progress, and payback calculations. It also uses Home Assistant daily recorder statistics when available.                                                                                                                               |
 
 ## Calculation and data availability
 
-The card calculates the benefit as self-consumed energy times `electricity_price`, plus exported energy times `feed_in_tariff`. With production input, self-consumed energy equals production minus export. It projects the payback date from the average benefit since `start_date`.
+The card calculates the benefit as self-consumed energy times `electricity_price`, plus exported energy times `feed_in_tariff`. With production input, self-consumed energy equals production since the baseline minus export since the baseline. The editor shows the baseline that matches the selected input model. It projects the payback date from the average benefit since `start_date`.
 
 When `use_location_seasonality` is `true`, the card estimates daily solar potential from the Home Assistant latitude. It converts observed benefit per accumulated solar potential into future daily benefit. This calculation runs locally and makes no network requests. The card uses the linear forecast when the option is disabled, coordinates are unavailable or invalid, or a seasonal result cannot be calculated.
 
-Set `annual_discount_rate` as a percentage, not a fraction. The card discounts each daily cashflow from `start_date` using 365.2425 days per year. A positive rate can delay payback. It can also make payback impossible within the forecast limit.
+Set `annual_discount_rate` as a percentage, not a fraction. Set `apply_annual_discount: true` to apply it to the main card. The card discounts each daily cashflow from `start_date` using 365.2425 days per year. A positive rate can delay payback. It can also make payback impossible within the forecast limit.
 
-Click the displayed benefit or estimated payback date to open the scenario comparison. The dialog always shows a linear forecast, a seasonal forecast, and a seasonal forecast using `annual_discount_rate`. When `annual_discount_rate` is not configured, only the comparison dialog uses a clearly marked default rate of 3%. The main card remains nominal until the parameter is configured. These comparisons remain available when the corresponding display options are disabled. Without a valid Home Assistant location, the seasonal rows transparently fall back to the linear forecast.
-
-With `use_historical_statistics: true`, the card requests only daily `sum` statistics through Home Assistant's recorder WebSocket API. It never requests raw history. The browser shares one successful or failed request per source, start date, and completed end date during its session. The card renders immediately with an even daily approximation. It updates once when recorder data arrives. Missing statistics, an unavailable recorder, or a failed request keep the approximation active. Recorder retention and enabled statistics can limit available historical days.
+With `apply_annual_discount: true`, the card requests only daily `sum` statistics through Home Assistant's recorder WebSocket API. It never requests raw history. The browser shares one successful or failed request per source, start date, and completed end date during its session. The card renders immediately with an even daily approximation. It updates once when recorder data arrives. Missing statistics, an unavailable recorder, or a failed request keep the approximation active. Recorder retention and enabled statistics can limit available historical days. The former `use_historical_statistics` key remains accepted for existing configurations, but new configurations should use `apply_annual_discount`.
 
 During a temporary `unknown` or `unavailable` state, the card uses the latest valid browser-stored reading. It visibly marks cached data and never treats a missing value as zero.
 

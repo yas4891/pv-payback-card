@@ -19,6 +19,7 @@ export type PVPaybackCardConfig = {
   export_energy_entity: string;
   production_energy_entity?: string;
   self_consumption_baseline?: number;
+  production_energy_baseline?: number;
   export_energy_baseline?: number;
   name?: string;
   icon?: string;
@@ -32,6 +33,8 @@ export type PVPaybackCardConfig = {
   show_contribution_segments?: boolean;
   use_location_seasonality?: boolean;
   annual_discount_rate?: number;
+  apply_annual_discount?: boolean;
+  /** @deprecated Use apply_annual_discount instead. */
   use_historical_statistics?: boolean;
 };
 
@@ -127,6 +130,7 @@ const editorTranslations = {
     export_energy_entity: "Entität für Einspeisung",
     production_energy_entity: "Entität für PV-Produktion",
     self_consumption_baseline: "Ausgangswert Eigenverbrauch (kWh)",
+    production_energy_baseline: "Ausgangswert PV-Produktion (kWh)",
     export_energy_baseline: "Ausgangswert Einspeisung (kWh)",
     show_breakdown: "Aufschlüsselung anzeigen",
     show_energy_values: "Energiewerte anzeigen",
@@ -136,7 +140,7 @@ const editorTranslations = {
     show_contribution_segments: "Anteile im Fortschrittsbalken getrennt anzeigen",
     use_location_seasonality: "Saisonale Prognose vom Home-Assistant-Standort verwenden",
     annual_discount_rate: "Jährlicher Abzinsungssatz in Prozent",
-    use_historical_statistics: "Historische Tagesstatistiken für die Abzinsung verwenden",
+    apply_annual_discount: "Jährliche Abzinsung anwenden",
   },
   en: {
     start_date: "Start date",
@@ -147,6 +151,7 @@ const editorTranslations = {
     export_energy_entity: "Export energy entity",
     production_energy_entity: "PV production energy entity",
     self_consumption_baseline: "Self-consumption baseline (kWh)",
+    production_energy_baseline: "PV production baseline (kWh)",
     export_energy_baseline: "Export baseline (kWh)",
     show_breakdown: "Show breakdown",
     show_energy_values: "Show energy values",
@@ -156,7 +161,7 @@ const editorTranslations = {
     show_contribution_segments: "Show separate contribution segments in progress bar",
     use_location_seasonality: "Use seasonal forecast from the Home Assistant location",
     annual_discount_rate: "Annual discount rate in percent",
-    use_historical_statistics: "Use historical daily statistics for discounting",
+    apply_annual_discount: "Apply annual discounting",
   },
 } as const;
 
@@ -180,8 +185,13 @@ export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardC
     show_contribution_segments: config.show_contribution_segments ?? false,
     use_location_seasonality: config.use_location_seasonality ?? false,
     annual_discount_rate: config.annual_discount_rate ?? 0,
-    use_historical_statistics: config.use_historical_statistics ?? false,
+    apply_annual_discount:
+      config.apply_annual_discount ?? config.use_historical_statistics ?? false,
   };
+}
+
+export function appliesAnnualDiscount(config: PVPaybackCardConfig): boolean {
+  return config.apply_annual_discount ?? config.use_historical_statistics ?? false;
 }
 
 export function displayName(name: string | undefined, localizedTitle: string): string {
@@ -374,7 +384,7 @@ export function loadHistoricalStatistics(
   config: PVPaybackCardConfig,
   now = new Date(),
 ): Promise<HistoricalStatistics | undefined> | undefined {
-  if (!hass.callWS || !config.use_historical_statistics || (config.annual_discount_rate ?? 0) <= 0)
+  if (!hass.callWS || !appliesAnnualDiscount(config) || (config.annual_discount_rate ?? 0) <= 0)
     return undefined;
   const start = new Date(`${config.start_date}T00:00:00`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(now.getTime())) return undefined;
@@ -515,17 +525,22 @@ function discountedPaybackDate(
 
 export function calculatePayback(
   config: PVPaybackCardConfig,
-  selfConsumption: number,
+  selfConsumptionOrProduction: number,
   exported: number,
   now = new Date(),
   location?: { latitude?: number; longitude?: number },
   historicalDays?: DailyEnergy[],
 ): Calculation {
-  const own = Math.max(0, selfConsumption - (config.self_consumption_baseline ?? 0));
   const exportEnergy = Math.max(0, exported - (config.export_energy_baseline ?? 0));
+  const own = config.self_consumption_entity
+    ? Math.max(0, selfConsumptionOrProduction - (config.self_consumption_baseline ?? 0))
+    : Math.max(
+        0,
+        selfConsumptionOrProduction - (config.production_energy_baseline ?? 0) - exportEnergy,
+      );
   const nominalOwnValue = own * config.electricity_price;
   const nominalExportValue = exportEnergy * config.feed_in_tariff;
-  if ((config.annual_discount_rate ?? 0) > 0) {
+  if (appliesAnnualDiscount(config) && (config.annual_discount_rate ?? 0) > 0) {
     const dailyEnergy = distributeHistoricalEnergy(
       config,
       own,
@@ -578,18 +593,22 @@ export function calculatePayback(
 /** Calculates all comparison scenarios independently from the card's display options. */
 export function calculateScenarioComparisons(
   config: PVPaybackCardConfig,
-  selfConsumption: number,
+  selfConsumptionOrProduction: number,
   exported: number,
   now = new Date(),
   location?: { latitude?: number; longitude?: number },
   historicalDays?: DailyEnergy[],
   comparisonDiscountRate = config.annual_discount_rate ?? 3,
 ): ScenarioCalculations {
-  const base = { ...config, use_historical_statistics: false };
+  const base = {
+    ...config,
+    apply_annual_discount: false,
+    use_historical_statistics: false,
+  };
   return {
     linear: calculatePayback(
       { ...base, use_location_seasonality: false, annual_discount_rate: 0 },
-      selfConsumption,
+      selfConsumptionOrProduction,
       exported,
       now,
       location,
@@ -597,7 +616,7 @@ export function calculateScenarioComparisons(
     ),
     seasonal: calculatePayback(
       { ...base, use_location_seasonality: true, annual_discount_rate: 0 },
-      selfConsumption,
+      selfConsumptionOrProduction,
       exported,
       now,
       location,
@@ -608,8 +627,9 @@ export function calculateScenarioComparisons(
         ...base,
         use_location_seasonality: true,
         annual_discount_rate: comparisonDiscountRate,
+        apply_annual_discount: true,
       },
-      selfConsumption,
+      selfConsumptionOrProduction,
       exported,
       now,
       location,
@@ -626,6 +646,7 @@ export function cacheKey(config: PVPaybackCardConfig, entity: string): string {
     config.export_energy_entity,
     config.start_date,
     config.self_consumption_baseline ?? 0,
+    config.production_energy_baseline ?? 0,
     config.export_energy_baseline ?? 0,
   ]);
   return `pv-payback-card:last-valid:${scope}:${entity}`;
@@ -679,6 +700,14 @@ function validConfig(config: PVPaybackCardConfig): string | undefined {
     if (!Number.isFinite(config[key]) || config[key] < 0) return key;
   }
   if (config.investment_cost <= 0) return "investment_cost";
+  for (const key of [
+    "self_consumption_baseline",
+    "production_energy_baseline",
+    "export_energy_baseline",
+  ] as const) {
+    const value = config[key];
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) return key;
+  }
   if (!Number.isFinite(config.annual_discount_rate ?? 0) || (config.annual_discount_rate ?? 0) < 0)
     return "annual_discount_rate";
   if (
@@ -710,6 +739,7 @@ export class PVPaybackCardEditor extends LitElement {
       "electricity_price",
       "feed_in_tariff",
       "self_consumption_baseline",
+      "production_energy_baseline",
       "export_energy_baseline",
       "annual_discount_rate",
     ].includes(target.name);
@@ -775,8 +805,11 @@ export class PVPaybackCardEditor extends LitElement {
       ["electricity_price", text.electricity_price, "number"],
       ["feed_in_tariff", text.feed_in_tariff, "number"],
     ];
+    const usesDirectSelfConsumption = Boolean(this._config.self_consumption_entity);
     const baselineFields: Array<[keyof PVPaybackCardConfig, string, string]> = [
-      ["self_consumption_baseline", text.self_consumption_baseline, "number"],
+      usesDirectSelfConsumption
+        ? ["self_consumption_baseline", text.self_consumption_baseline, "number"]
+        : ["production_energy_baseline", text.production_energy_baseline, "number"],
       ["export_energy_baseline", text.export_energy_baseline, "number"],
       ["annual_discount_rate", text.annual_discount_rate, "number"],
     ];
@@ -802,7 +835,7 @@ export class PVPaybackCardEditor extends LitElement {
         "show_progress",
         "show_contribution_segments",
         "use_location_seasonality",
-        "use_historical_statistics",
+        "apply_annual_discount",
       ] as const
     ).map(
       (name) =>
@@ -813,7 +846,7 @@ export class PVPaybackCardEditor extends LitElement {
             .checked=${
               name === "show_contribution_segments" ||
               name === "use_location_seasonality" ||
-              name === "use_historical_statistics"
+              name === "apply_annual_discount"
                 ? this._config[name] === true
                 : this._config[name] !== false
             }
@@ -876,7 +909,7 @@ export class PVPaybackCard extends LitElement {
       show_contribution_segments: false,
       use_location_seasonality: false,
       annual_discount_rate: 0,
-      use_historical_statistics: false,
+      apply_annual_discount: false,
     };
   }
 
@@ -906,7 +939,7 @@ export class PVPaybackCard extends LitElement {
     if (
       !config ||
       !this.hass?.callWS ||
-      !config.use_historical_statistics ||
+      !appliesAnnualDiscount(config) ||
       (config.annual_discount_rate ?? 0) <= 0
     )
       return;
@@ -1023,9 +1056,24 @@ export class PVPaybackCard extends LitElement {
   ): TemplateResult {
     const t = this.text();
     const rows = [
-      [t.scenarioLinear, scenarios.linear],
-      [t.scenarioSeasonal, scenarios.seasonal],
-      [t.scenarioDiscounted, scenarios.discounted],
+      {
+        name: t.scenarioLinear,
+        scenario: scenarios.linear,
+        icon: "mdi:chart-line",
+        className: "scenario-linear",
+      },
+      {
+        name: t.scenarioSeasonal,
+        scenario: scenarios.seasonal,
+        icon: "mdi:weather-sunny",
+        className: "scenario-seasonal",
+      },
+      {
+        name: t.scenarioDiscounted,
+        scenario: scenarios.discounted,
+        icon: "mdi:percent-circle-outline",
+        className: "scenario-discounted",
+      },
     ] as const;
     return html`<ha-dialog
       .open=${this._scenarioDialogOpen}
@@ -1035,9 +1083,12 @@ export class PVPaybackCard extends LitElement {
       <div class="scenario-dialog">
         ${!locationValid ? html`<p class="scenario-note">${t.locationFallback}</p>` : nothing}
         ${rows.map(
-          ([name, scenario], index) =>
-            html`<section class="scenario">
-              <h3>${name}</h3>
+          ({ name, scenario, icon, className }, index) =>
+            html`<section class=${`scenario ${className}`}>
+              <div class="scenario-heading">
+                <ha-icon .icon=${icon}></ha-icon>
+                <h3>${name}</h3>
+              </div>
               ${
                 index === 2
                   ? html`<div class="scenario-rate">
@@ -1113,7 +1164,7 @@ export class PVPaybackCard extends LitElement {
           )}
         </div></ha-card
       >`;
-    const selfConsumption = selfValue ?? productionValue! - exportedValue;
+    const selfConsumptionOrProduction = selfValue ?? productionValue!;
     const now = new Date();
     const location = {
       latitude: this.hass?.config?.latitude,
@@ -1124,7 +1175,7 @@ export class PVPaybackCard extends LitElement {
       : `approximation:${this._historicalStatisticsKey ?? ""}`;
     const calculationKey = JSON.stringify([
       config,
-      selfConsumption,
+      selfConsumptionOrProduction,
       exportedValue,
       dateKey(now),
       location,
@@ -1135,7 +1186,7 @@ export class PVPaybackCard extends LitElement {
         key: calculationKey,
         calculation: calculatePayback(
           config,
-          selfConsumption,
+          selfConsumptionOrProduction,
           exportedValue,
           now,
           location,
@@ -1152,7 +1203,7 @@ export class PVPaybackCard extends LitElement {
           key: scenarioCalculationKey,
           scenarios: calculateScenarioComparisons(
             config,
-            selfConsumption,
+            selfConsumptionOrProduction,
             exportedValue,
             now,
             location,
@@ -1487,12 +1538,30 @@ export class PVPaybackCard extends LitElement {
       padding-bottom: 8px;
     }
     .scenario {
+      --scenario-color: var(--secondary-text-color, #727272);
       padding: 14px;
+      border: 1px solid var(--scenario-color);
       background: var(--secondary-background-color);
+      background: color-mix(in srgb, var(--scenario-color) 12%, var(--card-background-color, #fff));
       border-radius: 12px;
     }
+    .scenario-seasonal {
+      --scenario-color: var(--success-color, #4caf50);
+    }
+    .scenario-discounted {
+      --scenario-color: var(--info-color, #03a9f4);
+    }
+    .scenario-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .scenario-heading ha-icon {
+      color: var(--scenario-color);
+    }
     .scenario h3 {
-      margin: 0 0 10px;
+      margin: 0;
       font-size: 1em;
     }
     .scenario-rate,
