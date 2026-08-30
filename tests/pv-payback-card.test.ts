@@ -388,6 +388,7 @@ describe("display configuration", () => {
 
   it("enables detailed energy and monetary values by default", () => {
     expect(withDisplayDefaults(config)).toMatchObject({
+      display_style: "full",
       show_breakdown: true,
       show_energy_values: true,
       show_money_values: true,
@@ -735,6 +736,26 @@ describe("scenario dialog", () => {
     const text = card.shadowRoot?.querySelector("ha-dialog")?.textContent?.replace(/\s+/g, " ");
     expect(text).toContain("Discount rate: 3% (default)");
   });
+
+  it("uses the compact layout with localized value tooltips", async () => {
+    const card = await createCard();
+    card.setConfig({ ...config, display_style: "compact" });
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".content")?.classList.contains("compact")).toBe(true);
+    expect(card.shadowRoot?.querySelector(".benefit")?.getAttribute("title")).toBe(
+      "Benefit to date",
+    );
+    expect(card.shadowRoot?.querySelector(".date")?.getAttribute("title")).toBe(
+      "Estimated payback",
+    );
+    expect(card.shadowRoot?.querySelector(".breakdown .own")?.getAttribute("title")).toBe(
+      "Self-consumption",
+    );
+    expect(card.shadowRoot?.querySelector(".breakdown .export")?.getAttribute("title")).toBe(
+      "Export",
+    );
+  });
 });
 
 describe("configuration editor", () => {
@@ -774,6 +795,22 @@ describe("configuration editor", () => {
       (editor.shadowRoot?.querySelector('[name="use_location_seasonality"]') as HTMLInputElement)
         .checked,
     ).toBe(false);
+  });
+
+  it("selects the full display style by default and preserves compact", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+    expect(
+      (editor.shadowRoot?.querySelector('[name="display_style"]') as HTMLSelectElement).value,
+    ).toBe("full");
+
+    editor.setConfig({ ...config, display_style: "compact" });
+    await editor.updateComplete;
+    expect(
+      (editor.shadowRoot?.querySelector('[name="display_style"]') as HTMLSelectElement).value,
+    ).toBe("compact");
   });
 
   it("passes the configured entity values to each picker", async () => {
@@ -825,7 +862,7 @@ describe("configuration editor", () => {
       "PV production energy entity",
       "Export energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(15);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(16);
   });
 
   it("emits the complete configuration after an entity changes", async () => {

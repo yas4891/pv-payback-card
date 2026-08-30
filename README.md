@@ -106,6 +106,7 @@ See [Combining production from multiple inverters](https://github.com/yas4891/pv
 | Option                       | Required | Default                   | Description and example                                                                                                                                                                                                                                                                          |
 | ---------------------------- | -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `start_date`                 | Yes      | —                         | Installation or accounting start date in `YYYY-MM-DD` format. Example: `"2024-12-01"`. The forecast uses the average benefit since this date.                                                                                                                                                    |
+| `display_style`              | No       | `full`                    | Selects the card layout. Use `full` for visible labels or `compact` for a shorter two-row value layout with localized tooltips. Example: `compact`.                                                                                                                                              |
 | `investment_cost`            | Yes      | —                         | Net investment cost after grants, entered as a number without a currency symbol or thousands separator. Example: `17653.06`.                                                                                                                                                                     |
 | `electricity_price`          | Yes      | —                         | Value of one self-consumed `kWh`, in the selected currency. Use a decimal point, never a comma. Example: `0.2` means EUR/USD 0.20 per `kWh`; `0,2` is not valid. This fixed value applies to the complete selected accounting period.                                                            |
 | `feed_in_tariff`             | Yes      | —                         | Remuneration for one exported `kWh`, in the selected currency. Use a decimal point, never a comma. Example: `0.075` means EUR/USD 0.075 per `kWh`; `0,075` is not valid. This fixed value applies to the complete selected accounting period.                                                    |
@@ -133,19 +134,13 @@ See [Combining production from multiple inverters](https://github.com/yas4891/pv
 
 The card calculates the benefit as self-consumed energy times `electricity_price`, plus exported energy times `feed_in_tariff`. With production input, self-consumed energy equals production since the baseline minus export since the baseline. The editor shows the baseline that matches the selected input model. It projects the payback date from the average benefit since `start_date`.
 
-When `use_location_seasonality` is `true`, the card estimates daily solar potential from the Home Assistant latitude. It converts observed benefit per accumulated solar potential into future daily benefit. This calculation runs locally and makes no network requests. The card uses the linear forecast when the option is disabled, coordinates are unavailable or invalid, or a seasonal result cannot be calculated.
-
-Set `annual_discount_rate` as a percentage, not a fraction. Set `apply_annual_discount: true` to apply it to the main card. The card discounts each daily cashflow from `start_date` using 365.2425 days per year. A positive rate can delay payback. It can also make payback impossible within the forecast limit.
-
-With `apply_annual_discount: true`, the card requests only daily `sum` statistics through Home Assistant's recorder WebSocket API. It never requests raw history. The browser shares one successful or failed request per source, start date, and completed end date during its session. The card renders immediately with an even daily approximation. It updates once when recorder data arrives. Missing statistics, an unavailable recorder, or a failed request keep the approximation active. Recorder retention and enabled statistics can limit available historical days. The former `use_historical_statistics` key remains accepted for existing configurations, but new configurations should use `apply_annual_discount`.
+See [Seasonality and discounting](https://github.com/yas4891/pv-payback-card/wiki/Seasonality-and-discounting) for configuration, calculation details, recorder usage, and limitations.
 
 During a temporary `unknown` or `unavailable` state, the card uses the latest valid browser-stored reading. It visibly marks cached data and never treats a missing value as zero.
 
 If a cumulative counter briefly reports a lower value, the card keeps the higher cached value. It displays a localized warning that names the affected entity. Changing the selected input model, entities, date, or baselines starts a separate cache scope.
 
 See [Correct configuration after replacing an energy meter](https://github.com/yas4891/pv-payback-card/wiki/Correct-configuration-after-replacing-an-energy-meter) for baseline formulas and practical replacement examples.
-
-The seasonal estimate assumes a constant self-consumption share. It does not model weather, shading, tariff changes, maintenance, financing, or degradation. Use a helper that calculates cumulative monetary benefit when those assumptions need a more detailed model.
 
 ## Development
 

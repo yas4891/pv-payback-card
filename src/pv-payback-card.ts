@@ -11,6 +11,7 @@ type HomeAssistant = {
 
 export type PVPaybackCardConfig = {
   type: string;
+  display_style?: "full" | "compact";
   start_date: string;
   investment_cost: number;
   electricity_price: number;
@@ -129,6 +130,9 @@ const translations = {
 
 const editorTranslations = {
   de: {
+    display_style: "Darstellung",
+    display_style_full: "Vollständig",
+    display_style_compact: "Kompakt",
     start_date: "Startdatum",
     investment_cost: "Investitionskosten",
     electricity_price: "Strompreis pro kWh",
@@ -150,6 +154,9 @@ const editorTranslations = {
     apply_annual_discount: "Jährliche Abzinsung anwenden",
   },
   en: {
+    display_style: "Display style",
+    display_style_full: "Full",
+    display_style_compact: "Compact",
     start_date: "Start date",
     investment_cost: "Investment cost",
     electricity_price: "Electricity price per kWh",
@@ -184,6 +191,7 @@ export function energyToKwh(value: number, unit: unknown): number | undefined {
 export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardConfig {
   return {
     ...config,
+    display_style: config.display_style ?? "full",
     show_breakdown: config.show_breakdown ?? true,
     show_energy_values: config.show_energy_values ?? true,
     show_money_values: config.show_money_values ?? true,
@@ -701,6 +709,8 @@ export function chooseEnergyValue(
 }
 
 function validConfig(config: PVPaybackCardConfig): string | undefined {
+  if (config.display_style !== undefined && !["full", "compact"].includes(config.display_style))
+    return "display_style";
   if (!config.start_date || Number.isNaN(new Date(`${config.start_date}T00:00:00`).getTime()))
     return "start_date";
   for (const key of ["investment_cost", "electricity_price", "feed_in_tariff"] as const) {
@@ -830,37 +840,46 @@ export class PVPaybackCardEditor extends LitElement {
           @change=${this.changed}
       /></label>`;
     return html`${requiredFields.map(
-      textField,
-    )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
-      textField,
-    )}${(
-      [
-        "show_breakdown",
-        "show_energy_values",
-        "show_money_values",
-        "show_payback_date",
-        "show_progress",
-        "show_contribution_segments",
-        "use_location_seasonality",
-        "apply_annual_discount",
-      ] as const
-    ).map(
-      (name) =>
-        html`<label
-          ><input
-            name=${name}
-            type="checkbox"
-            .checked=${
-              name === "show_contribution_segments" ||
-              name === "use_location_seasonality" ||
-              name === "apply_annual_discount"
-                ? this._config[name] === true
-                : this._config[name] !== false
-            }
-            @change=${this.changed}
-          />${text[name]}</label
-        >`,
-    )}`;
+        textField,
+      )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
+        textField,
+      )}<label
+        >${text.display_style}<select
+          name="display_style"
+          .value=${this._config.display_style ?? "full"}
+          @change=${this.changed}
+        >
+          <option value="full">${text.display_style_full}</option>
+          <option value="compact">${text.display_style_compact}</option>
+        </select></label
+      >${(
+        [
+          "show_breakdown",
+          "show_energy_values",
+          "show_money_values",
+          "show_payback_date",
+          "show_progress",
+          "show_contribution_segments",
+          "use_location_seasonality",
+          "apply_annual_discount",
+        ] as const
+      ).map(
+        (name) =>
+          html`<label
+            ><input
+              name=${name}
+              type="checkbox"
+              .checked=${
+                name === "show_contribution_segments" ||
+                name === "use_location_seasonality" ||
+                name === "apply_annual_discount"
+                  ? this._config[name] === true
+                  : this._config[name] !== false
+              }
+              @change=${this.changed}
+            />${text[name]}</label
+          >`,
+      )}`;
   }
 
   static styles = css`
@@ -869,6 +888,13 @@ export class PVPaybackCardEditor extends LitElement {
       margin: 10px 0;
     }
     input {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      padding: 8px;
+    }
+    select {
       box-sizing: border-box;
       display: block;
       width: 100%;
@@ -908,6 +934,7 @@ export class PVPaybackCard extends LitElement {
   static getStubConfig(): Partial<PVPaybackCardConfig> {
     return {
       type: "custom:pv-payback-card",
+      display_style: "full",
       show_breakdown: true,
       show_energy_values: true,
       show_money_values: true,
@@ -1302,8 +1329,9 @@ export class PVPaybackCard extends LitElement {
       Math.max(0, 100 - ownContribution),
       Math.max(0, (calc.exportValue / config.investment_cost) * 100),
     );
+    const compact = config.display_style === "compact";
     return html`<ha-card>
-        <div class="content">
+        <div class=${`content ${compact ? "compact" : "full"}`}>
           <div class="header">
             <div class="header-title">
               <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
@@ -1328,7 +1356,7 @@ export class PVPaybackCard extends LitElement {
               }
             </div>
           </div>
-          <div class="benefit">
+          <div class="benefit" title=${compact ? t.benefit : nothing}>
             <span>${t.benefit}</span
             ><strong
               class="scenario-trigger"
@@ -1374,7 +1402,8 @@ export class PVPaybackCard extends LitElement {
                     class="own"
                     role=${config.self_consumption_entity ? "button" : nothing}
                     tabindex=${config.self_consumption_entity ? "0" : nothing}
-                    aria-label=${config.self_consumption_entity ? t.own : nothing}
+                    aria-label=${t.own}
+                    title=${compact ? t.own : nothing}
                     @click=${
                       config.self_consumption_entity
                         ? () => this.openMoreInfo(config.self_consumption_entity!)
@@ -1403,6 +1432,7 @@ export class PVPaybackCard extends LitElement {
                     role="button"
                     tabindex="0"
                     aria-label=${t.export}
+                    title=${compact ? t.export : nothing}
                     @click=${() => this.openMoreInfo(config.export_energy_entity)}
                     @keydown=${(event: KeyboardEvent) =>
                       this.handleBreakdownKeydown(event, config.export_energy_entity)}
@@ -1423,7 +1453,7 @@ export class PVPaybackCard extends LitElement {
           }
           ${
             config.show_payback_date
-              ? html`<div class="date">
+              ? html`<div class="date" title=${compact ? t.expected : nothing}>
                   <span>${t.expected}</span
                   ><b
                     class="scenario-trigger"
@@ -1456,6 +1486,15 @@ export class PVPaybackCard extends LitElement {
     .content {
       padding: 16px;
       color: var(--primary-text-color);
+    }
+    .content.compact {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 16px;
+    }
+    .compact .header {
+      grid-row: 1;
+      grid-column: 1 / -1;
     }
     .header {
       display: flex;
@@ -1499,6 +1538,25 @@ export class PVPaybackCard extends LitElement {
     .benefit strong {
       font-size: 1.7em;
     }
+    .compact .benefit {
+      grid-row: 2;
+      grid-column: 1;
+      justify-content: flex-start;
+      min-width: 0;
+      margin: 16px 0 10px;
+    }
+    .compact .benefit strong {
+      max-width: 100%;
+      overflow: hidden;
+      font-size: 1.15em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .compact .benefit span,
+    .compact .date span,
+    .compact .breakdown span {
+      display: none;
+    }
     .scenario-trigger {
       border-radius: 4px;
       cursor: pointer;
@@ -1518,6 +1576,10 @@ export class PVPaybackCard extends LitElement {
       background: var(--secondary-background-color);
       border-radius: 99px;
       overflow: hidden;
+    }
+    .compact .bar {
+      grid-row: 3;
+      grid-column: 1 / -1;
     }
     .bar div {
       height: 100%;
@@ -1549,6 +1611,18 @@ export class PVPaybackCard extends LitElement {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
       margin-top: 18px;
+    }
+    .compact .breakdown {
+      grid-row: 4;
+      grid-column: 1 / -1;
+      margin-top: 12px;
+    }
+    .compact .breakdown b {
+      display: block;
+      overflow: hidden;
+      font-size: 0.82em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .breakdown div {
       display: grid;
@@ -1586,6 +1660,21 @@ export class PVPaybackCard extends LitElement {
     }
     .date b {
       text-align: end;
+    }
+    .compact .date {
+      grid-row: 2;
+      grid-column: 2;
+      align-items: baseline;
+      justify-content: flex-end;
+      min-width: 0;
+      margin: 16px 0 10px;
+    }
+    .compact .date b {
+      max-width: 100%;
+      overflow: hidden;
+      font-size: 1.15em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .error {
       margin-top: 16px;
@@ -1661,6 +1750,18 @@ export class PVPaybackCard extends LitElement {
       }
       .date b {
         text-align: start;
+      }
+      .content.compact .breakdown {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .content.compact .date,
+      .content.compact .benefit {
+        align-items: baseline;
+        flex-direction: row;
+        gap: 0;
+      }
+      .content.compact .date b {
+        text-align: end;
       }
       .scenario-dialog {
         min-width: 0;

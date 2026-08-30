@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-08-30
+
+- Added the optional `display_style: compact` layout with localized tooltips and a visual-editor selector.
+- Moved detailed seasonality and discounting guidance into a dedicated project wiki article.
+
 ## 0.3.4 - 2026-08-29
 
 - Delayed cached-data warnings until the underlying problem persists continuously for three minutes.
