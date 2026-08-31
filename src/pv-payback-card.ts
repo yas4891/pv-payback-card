@@ -89,6 +89,7 @@ const translations = {
     counterRegression:
       "Zählerstand ist niedriger als der zuletzt gültige Wert. Gespeicherter Wert wird weiter verwendet.",
     invalid: "Ungültige Konfiguration",
+    warningTitle: "Warnung",
     scenariosTitle: "Amortisationsszenarien",
     scenariosOpen: "Amortisationsszenarien öffnen",
     scenarioLinear: "Nur linear",
@@ -115,6 +116,7 @@ const translations = {
     counterRegression:
       "Counter value is lower than the last valid value. The saved value remains in use.",
     invalid: "Invalid configuration",
+    warningTitle: "Warning",
     scenariosTitle: "Payback scenarios",
     scenariosOpen: "Open payback scenarios",
     scenarioLinear: "Linear only",
@@ -130,6 +132,9 @@ const translations = {
 
 const editorTranslations = {
   de: {
+    advanced_settings: "Erweiterte Einstellungen",
+    advanced_settings_description:
+      "Optionale Einstellungen für direkten Eigenverbrauch, Darstellung, Saisonalität und Abzinsung.",
     display_style: "Darstellung",
     display_style_full: "Vollständig",
     display_style_compact: "Kompakt",
@@ -154,6 +159,9 @@ const editorTranslations = {
     apply_annual_discount: "Jährliche Abzinsung anwenden",
   },
   en: {
+    advanced_settings: "Advanced settings",
+    advanced_settings_description:
+      "Optional settings for direct self-consumption, display, seasonality, and discounting.",
     display_style: "Display style",
     display_style_full: "Full",
     display_style_compact: "Compact",
@@ -736,17 +744,42 @@ function validConfig(config: PVPaybackCardConfig): string | undefined {
 }
 
 export class PVPaybackCardEditor extends LitElement {
-  static properties = { hass: { attribute: false }, _config: { state: true } };
+  static properties = {
+    hass: { attribute: false },
+    _config: { state: true },
+    _advancedOpen: { state: true },
+  };
   declare hass?: HomeAssistant;
   declare _config: Partial<PVPaybackCardConfig>;
+  declare _advancedOpen: boolean;
 
   constructor() {
     super();
     this._config = {};
+    this._advancedOpen = false;
   }
 
   setConfig(config: PVPaybackCardConfig): void {
     this._config = { ...config };
+    if (
+      config.self_consumption_entity ||
+      config.self_consumption_baseline !== undefined ||
+      config.use_location_seasonality === true ||
+      config.apply_annual_discount === true ||
+      config.use_historical_statistics === true ||
+      (config.annual_discount_rate ?? 0) !== 0 ||
+      config.show_breakdown === false ||
+      config.show_energy_values === false ||
+      config.show_money_values === false ||
+      config.show_payback_date === false ||
+      config.show_progress === false
+    ) {
+      this._advancedOpen = true;
+    }
+  }
+
+  private toggleAdvanced(): void {
+    this._advancedOpen = !this._advancedOpen;
   }
 
   private changed(event: Event): void {
@@ -825,12 +858,12 @@ export class PVPaybackCardEditor extends LitElement {
       ["electricity_price", text.electricity_price, "number"],
       ["feed_in_tariff", text.feed_in_tariff, "number"],
     ];
-    const usesDirectSelfConsumption = Boolean(this._config.self_consumption_entity);
-    const baselineFields: Array<[keyof PVPaybackCardConfig, string, string]> = [
-      usesDirectSelfConsumption
-        ? ["self_consumption_baseline", text.self_consumption_baseline, "number"]
-        : ["production_energy_baseline", text.production_energy_baseline, "number"],
+    const standardBaselineFields: Array<[keyof PVPaybackCardConfig, string, string]> = [
+      ["production_energy_baseline", text.production_energy_baseline, "number"],
       ["export_energy_baseline", text.export_energy_baseline, "number"],
+    ];
+    const advancedFields: Array<[keyof PVPaybackCardConfig, string, string]> = [
+      ["self_consumption_baseline", text.self_consumption_baseline, "number"],
       ["annual_discount_rate", text.annual_discount_rate, "number"],
     ];
     const textField = ([name, label, type]: [keyof PVPaybackCardConfig, string, string]) =>
@@ -842,9 +875,34 @@ export class PVPaybackCardEditor extends LitElement {
           .value=${String(this._config[name] ?? "")}
           @change=${this.changed}
       /></label>`;
+    const checkboxField = (
+      name:
+        | "show_breakdown"
+        | "show_energy_values"
+        | "show_money_values"
+        | "show_payback_date"
+        | "show_progress"
+        | "show_contribution_segments"
+        | "use_location_seasonality"
+        | "apply_annual_discount",
+    ) =>
+      html`<label
+        ><input
+          name=${name}
+          type="checkbox"
+          .checked=${
+            name === "show_contribution_segments" ||
+            name === "use_location_seasonality" ||
+            name === "apply_annual_discount"
+              ? this._config[name] === true
+              : this._config[name] !== false
+          }
+          @change=${this.changed}
+        />${text[name]}</label
+      >`;
     return html`${requiredFields.map(
         textField,
-      )}${this.entityField("self_consumption_entity", text.self_consumption_entity)}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${baselineFields.map(
+      )}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${standardBaselineFields.map(
         textField,
       )}<label
         >${text.display_style}<select
@@ -855,34 +913,28 @@ export class PVPaybackCardEditor extends LitElement {
           <option value="full">${text.display_style_full}</option>
           <option value="compact">${text.display_style_compact}</option>
         </select></label
-      >${(
-        [
-          "show_breakdown",
-          "show_energy_values",
-          "show_money_values",
-          "show_payback_date",
-          "show_progress",
-          "show_contribution_segments",
-          "use_location_seasonality",
-          "apply_annual_discount",
-        ] as const
-      ).map(
-        (name) =>
-          html`<label
-            ><input
-              name=${name}
-              type="checkbox"
-              .checked=${
-                name === "show_contribution_segments" ||
-                name === "use_location_seasonality" ||
-                name === "apply_annual_discount"
-                  ? this._config[name] === true
-                  : this._config[name] !== false
-              }
-              @change=${this.changed}
-            />${text[name]}</label
-          >`,
-      )}`;
+      >${checkboxField("show_contribution_segments")}
+      <button
+        class="advanced-toggle"
+        type="button"
+        aria-expanded=${this._advancedOpen ? "true" : "false"}
+        @click=${this.toggleAdvanced}
+      >
+        <span>${text.advanced_settings}</span>
+        <ha-icon icon=${this._advancedOpen ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
+      </button>
+      ${
+        this._advancedOpen
+          ? html`<section class="advanced-settings">
+              <p>${text.advanced_settings_description}</p>
+              ${this.entityField("self_consumption_entity", text.self_consumption_entity)}
+              ${advancedFields.map(textField)} ${checkboxField("show_breakdown")}
+              ${checkboxField("show_energy_values")} ${checkboxField("show_money_values")}
+              ${checkboxField("show_payback_date")} ${checkboxField("show_progress")}
+              ${checkboxField("use_location_seasonality")} ${checkboxField("apply_annual_discount")}
+            </section>`
+          : nothing
+      }`;
   }
 
   static styles = css`
@@ -915,6 +967,34 @@ export class PVPaybackCardEditor extends LitElement {
       min-height: 20px;
       margin-inline-end: 8px;
     }
+    .advanced-toggle {
+      display: flex;
+      width: 100%;
+      min-height: 44px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding: 8px 0;
+      border: 0;
+      background: transparent;
+      color: var(--primary-color);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .advanced-toggle:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+    .advanced-settings {
+      padding-top: 4px;
+      border-top: 1px solid var(--divider-color);
+    }
+    .advanced-settings p {
+      margin: 8px 0 12px;
+      color: var(--secondary-text-color);
+      font-size: 0.9em;
+    }
   `;
 }
 customElements.define("pv-payback-card-editor", PVPaybackCardEditor);
@@ -924,10 +1004,12 @@ export class PVPaybackCard extends LitElement {
     hass: { attribute: false },
     _config: { state: true },
     _scenarioDialogOpen: { state: true },
+    _warningDialogMessage: { state: true },
   };
   declare hass?: HomeAssistant;
   declare _config?: PVPaybackCardConfig;
   declare _scenarioDialogOpen: boolean;
+  declare _warningDialogMessage?: string;
 
   constructor() {
     super();
@@ -988,8 +1070,7 @@ export class PVPaybackCard extends LitElement {
   private persistentWarningReadings(readings: EnergyRead[]): EnergyRead[] {
     const now = Date.now();
     const active = readings.filter(
-      (reading): reading is EnergyRead & { issueKey: string } =>
-        reading.cached && reading.issueKey !== undefined,
+      (reading): reading is EnergyRead & { issueKey: string } => reading.issueKey !== undefined,
     );
     const activeKeys = new Set(active.map((reading) => reading.issueKey));
     for (const key of this._warningStartedAt.keys()) {
@@ -1057,6 +1138,9 @@ export class PVPaybackCard extends LitElement {
     const current = energyToKwh(numeric, state?.attributes?.unit_of_measurement);
     const cached = readCachedEnergy(localStorage, cacheKey(config, entityId));
     const selected = chooseEnergyValue(current, cached);
+    const unit = state?.attributes?.unit_of_measurement;
+    const unavailableWarning =
+      state && !isUnit(unit) ? messages.unsupportedUnit : messages.entityUnavailable;
     if (selected.value !== undefined) {
       if (!selected.cached) {
         const saved = JSON.stringify({
@@ -1073,15 +1157,19 @@ export class PVPaybackCard extends LitElement {
         value: selected.value,
         cached: selected.cached,
         timestamp: selected.cached ? cached?.timestamp : state?.last_updated,
-        warning: selected.regression ? `${entityId}: ${messages.counterRegression}` : undefined,
+        warning: selected.regression
+          ? `${entityId}: ${messages.counterRegression}`
+          : selected.cached
+            ? `${entityId}: ${unavailableWarning}`
+            : undefined,
         issueKey: selected.cached
           ? `${entityId}:${selected.regression ? "regression" : "unavailable"}`
           : undefined,
       };
     }
-    const unit = state?.attributes?.unit_of_measurement;
     return {
       cached: false,
+      issueKey: `${entityId}:${state && !isUnit(unit) ? "unsupported-unit" : "unavailable"}`,
       warning:
         state && !isUnit(unit)
           ? `${entityId}: ${messages.unsupportedUnit}`
@@ -1116,7 +1204,7 @@ export class PVPaybackCard extends LitElement {
       ? new Intl.DateTimeFormat(this._config?.locale ?? this.hass?.locale?.language, {
           dateStyle: "medium",
         }).format(date)
-      : this.text().noProjection;
+      : "—";
   }
 
   private formatPercentage(value: number): string {
@@ -1165,13 +1253,23 @@ export class PVPaybackCard extends LitElement {
         className: "scenario-discounted",
       },
     ] as const;
+    const scenarioWarnings = [
+      !locationValid ? t.locationFallback : undefined,
+      rows.some(({ scenario }) => !scenario.paybackDate) ? t.noProjection : undefined,
+    ].filter((message) => message !== undefined);
     return html`<ha-dialog
       .open=${this._scenarioDialogOpen}
       .heading=${t.scenariosTitle}
       @closed=${this.closeScenarioDialog}
     >
       <div class="scenario-dialog">
-        ${!locationValid ? html`<p class="scenario-note">${t.locationFallback}</p>` : nothing}
+        ${
+          scenarioWarnings.length > 0
+            ? html`<div class="scenario-warning">
+                ${this.renderWarningIndicator(scenarioWarnings.join("\n"))}
+              </div>`
+            : nothing
+        }
         ${rows.map(
           ({ name, scenario, icon, className }, index) =>
             html`<section class=${`scenario ${className}`}>
@@ -1203,6 +1301,56 @@ export class PVPaybackCard extends LitElement {
     </ha-dialog>`;
   }
 
+  private renderWarningIndicator(message: string): TemplateResult {
+    return html`<button
+      class="warning-indicator"
+      type="button"
+      aria-label=${message}
+      title=${message}
+      @click=${() => {
+        this._warningDialogMessage = message;
+      }}
+    >
+      <ha-icon icon="mdi:alert"></ha-icon>
+    </button>`;
+  }
+
+  private closeWarningDialog(): void {
+    this._warningDialogMessage = undefined;
+  }
+
+  private renderWarningDialog(): TemplateResult | typeof nothing {
+    if (!this._warningDialogMessage) return nothing;
+    const t = this.text();
+    return html`<ha-dialog
+      .open=${true}
+      .heading=${t.warningTitle}
+      @closed=${this.closeWarningDialog}
+    >
+      <div class="warning-dialog-message">${this._warningDialogMessage}</div>
+      <ha-button slot="primaryAction" @click=${this.closeWarningDialog}>${t.close}</ha-button>
+    </ha-dialog>`;
+  }
+
+  private renderStatusCard(message?: string): TemplateResult {
+    const config = this._config!;
+    const t = this.text();
+    return html`<ha-card>
+        <div class="content status-only">
+          <div class="header">
+            <div class="header-title">
+              <ha-icon .icon=${config.icon ?? "mdi:solar-power-variant"}></ha-icon
+              ><span>${displayName(config.name, t.title)}</span>
+            </div>
+            <div class="header-meta">
+              ${message ? this.renderWarningIndicator(message) : nothing}
+            </div>
+          </div>
+        </div>
+      </ha-card>
+      ${this.renderWarningDialog()}`;
+  }
+
   private openMoreInfo(entityId: string): void {
     this.dispatchEvent(
       new CustomEvent("hass-more-info", {
@@ -1224,10 +1372,16 @@ export class PVPaybackCard extends LitElement {
     if (!config) return nothing;
     const t = this.text();
     const configError = validConfig(config);
-    if (configError)
-      return html`<ha-card
-        ><div class="content error" role="alert">${t.invalid}: ${configError}</div></ha-card
-      >`;
+    if (configError) {
+      const warnings = this.persistentWarningReadings([
+        {
+          cached: false,
+          issueKey: `configuration:${configError}`,
+          warning: `${t.invalid}: ${configError}`,
+        },
+      ]);
+      return this.renderStatusCard(warnings[0]?.warning);
+    }
     const self = config.self_consumption_entity
       ? this.readEnergy(config, config.self_consumption_entity, t)
       : undefined;
@@ -1239,7 +1393,7 @@ export class PVPaybackCard extends LitElement {
     const sourceReadings = [self, production, exported].filter((reading): reading is EnergyRead =>
       Boolean(reading),
     );
-    const warningReadings = this.persistentWarningReadings(sourceReadings);
+    let warningReadings = this.persistentWarningReadings(sourceReadings);
     const selfValue = self?.value;
     const productionValue = production?.value;
     const exportedValue = exported.value;
@@ -1247,14 +1401,16 @@ export class PVPaybackCard extends LitElement {
       exportedValue === undefined ||
       (self !== undefined && selfValue === undefined) ||
       (production !== undefined && productionValue === undefined)
-    )
-      return html`<ha-card
-        ><div class="content error" role="alert">
-          ${t.unavailable}${sourceReadings.map((reading) =>
-            reading.warning ? html`<br />${reading.warning}` : nothing,
-          )}
-        </div></ha-card
-      >`;
+    ) {
+      const warning =
+        warningReadings.length > 0
+          ? `${t.unavailable}${warningReadings
+              .filter((reading) => reading.warning)
+              .map((reading) => ` ${reading.warning}`)
+              .join("")}`
+          : undefined;
+      return this.renderStatusCard(warning);
+    }
     const selfConsumptionOrProduction = selfValue ?? productionValue!;
     const now = new Date();
     const location = {
@@ -1286,6 +1442,18 @@ export class PVPaybackCard extends LitElement {
       };
     }
     const calc = this._calculationCache.calculation;
+    const projectionIssue: EnergyRead | undefined =
+      config.show_payback_date && !calc.paybackDate
+        ? {
+            cached: false,
+            issueKey: "projection:no-positive-benefit",
+            warning: t.noProjection,
+          }
+        : undefined;
+    warningReadings = this.persistentWarningReadings([
+      ...sourceReadings,
+      ...(projectionIssue ? [projectionIssue] : []),
+    ]);
     let scenarios: ScenarioCalculations | undefined;
     if (this._scenarioDialogOpen) {
       const scenarioCalculationKey = `${calculationKey}:${this._comparisonDiscountRate}`;
@@ -1305,25 +1473,36 @@ export class PVPaybackCard extends LitElement {
       }
       scenarios = this._scenarioCalculationCache.scenarios;
     }
-    const cached = warningReadings.length > 0;
-    const cacheTime = warningReadings
+    const dataWarningReadings = warningReadings.filter(
+      (reading) => reading.issueKey !== "projection:no-positive-benefit",
+    );
+    const cacheTime = dataWarningReadings
       .map((reading) => reading.timestamp)
       .filter(Boolean)
       .sort()
       .at(0);
-    const cacheWarning = cached
-      ? `${t.cached}${
-          cacheTime
-            ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, {
-                dateStyle: "short",
-                timeStyle: "short",
-              }).format(new Date(cacheTime))}`
-            : ""
-        }${warningReadings
-          .filter((reading) => reading.warning)
-          .map((reading) => ` ${reading.warning}`)
-          .join("")}`
+    const cacheWarning =
+      dataWarningReadings.length > 0
+        ? `${t.cached}${
+            cacheTime
+              ? `: ${new Intl.DateTimeFormat(config.locale ?? this.hass?.locale?.language, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                }).format(new Date(cacheTime))}`
+              : ""
+          }${dataWarningReadings
+            .filter((reading) => reading.warning)
+            .map((reading) => ` ${reading.warning}`)
+            .join("")}`
+        : undefined;
+    const projectionWarning = warningReadings.some(
+      (reading) => reading.issueKey === "projection:no-positive-benefit",
+    )
+      ? t.noProjection
       : undefined;
+    const cardWarning = [cacheWarning, projectionWarning]
+      .filter((message): message is string => Boolean(message))
+      .join("\n");
     const ownContribution = Math.min(
       100,
       Math.max(0, (calc.ownValue / config.investment_cost) * 100),
@@ -1341,17 +1520,7 @@ export class PVPaybackCard extends LitElement {
               ><span>${displayName(config.name, t.title)}</span>
             </div>
             <div class="header-meta">
-              ${
-                cacheWarning
-                  ? html`<span
-                      class="warning-indicator"
-                      role="img"
-                      aria-label=${cacheWarning}
-                      title=${cacheWarning}
-                      ><ha-icon icon="mdi:alert"></ha-icon
-                    ></span>`
-                  : nothing
-              }
+              ${cardWarning ? this.renderWarningIndicator(cardWarning) : nothing}
               ${
                 config.show_progress
                   ? html`<span class="header-progress">${calc.progress.toFixed(1)}%</span>`
@@ -1479,7 +1648,8 @@ export class PVPaybackCard extends LitElement {
               validLocation(location.latitude, location.longitude),
             )
           : nothing
-      }`;
+      }
+      ${this.renderWarningDialog()}`;
   }
 
   static styles = css`
@@ -1527,10 +1697,20 @@ export class PVPaybackCard extends LitElement {
     }
     .warning-indicator {
       display: inline-flex;
+      padding: 0;
+      border: 0;
+      background: transparent;
       color: var(--warning-color, #ff9800);
+      cursor: pointer;
+      font: inherit;
     }
     .warning-indicator ha-icon {
       color: inherit;
+    }
+    .warning-indicator:focus-visible {
+      outline: 2px solid var(--warning-color, #ff9800);
+      outline-offset: 3px;
+      border-radius: 4px;
     }
     .benefit {
       display: flex;
@@ -1679,10 +1859,12 @@ export class PVPaybackCard extends LitElement {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .error {
-      margin-top: 16px;
-      color: var(--warning-color);
-      font-size: 0.88em;
+    .status-only {
+      min-height: 24px;
+    }
+    .warning-dialog-message {
+      max-width: 520px;
+      white-space: pre-wrap;
     }
     .scenario-dialog {
       display: grid;
@@ -1718,12 +1900,12 @@ export class PVPaybackCard extends LitElement {
       font-size: 1em;
     }
     .scenario-rate,
-    .scenario-note,
     .scenario-values span {
       color: var(--secondary-text-color);
     }
-    .scenario-note {
-      margin: 0;
+    .scenario-warning {
+      display: flex;
+      justify-content: flex-end;
     }
     .scenario-rate {
       margin: -4px 0 10px;

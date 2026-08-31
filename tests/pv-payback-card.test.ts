@@ -657,6 +657,61 @@ describe("persistent warning delay", () => {
 
     expect(card.shadowRoot?.querySelector(".warning-indicator")).toBeNull();
   });
+
+  it("shows unavailable details only through the warning indicator", async () => {
+    vi.useFakeTimers();
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "unavailable", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "50", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language: "en" },
+      config: { currency: "EUR" },
+    };
+    card.setConfig(config);
+    document.body.append(card);
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.textContent).not.toContain("No valid energy values");
+    await vi.advanceTimersByTimeAsync(180_000);
+    await card.updateComplete;
+    const warning = card.shadowRoot?.querySelector(".warning-indicator") as HTMLButtonElement;
+    expect(warning.title).toContain("sensor.own: unavailable");
+    expect(card.shadowRoot?.textContent).not.toContain("sensor.own: unavailable");
+
+    warning.click();
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector("ha-dialog")?.textContent).toContain(
+      "sensor.own: unavailable",
+    );
+  });
+
+  it("shows invalid configuration details only through the warning indicator", async () => {
+    vi.useFakeTimers();
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = { states: {}, locale: { language: "en" } };
+    card.setConfig({ ...config, investment_cost: 0 });
+    document.body.append(card);
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.textContent).not.toContain("Invalid configuration");
+    await vi.advanceTimersByTimeAsync(180_000);
+    await card.updateComplete;
+    const warning = card.shadowRoot?.querySelector(".warning-indicator") as HTMLButtonElement;
+    expect(warning.title).toBe("Invalid configuration: investment_cost");
+
+    warning.click();
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector("ha-dialog")?.textContent).toContain(
+      "Invalid configuration: investment_cost",
+    );
+  });
 });
 
 describe("scenario dialog", () => {
@@ -824,28 +879,63 @@ describe("configuration editor", () => {
     ) as Array<HTMLElement & { value?: string }>;
     expect(pickers).toHaveLength(3);
     expect(pickers.map((picker) => picker.value)).toEqual([
-      config.self_consumption_entity,
       "",
       config.export_energy_entity,
+      config.self_consumption_entity,
     ]);
   });
 
-  it("shows the baseline for the selected energy input model", async () => {
+  it("keeps production inputs standard and direct self-consumption advanced", async () => {
     const editor = await createEditor();
 
     editor.setConfig(config);
     await editor.updateComplete;
+    expect(
+      editor.shadowRoot?.querySelector(".advanced-toggle")?.getAttribute("aria-expanded"),
+    ).toBe("true");
     expect(editor.shadowRoot?.querySelector('[name="self_consumption_baseline"]')).not.toBeNull();
-    expect(editor.shadowRoot?.querySelector('[name="production_energy_baseline"]')).toBeNull();
+    expect(editor.shadowRoot?.querySelector('[name="production_energy_baseline"]')).not.toBeNull();
 
+    const standardEditor = await createEditor();
+    standardEditor.setConfig({
+      ...config,
+      self_consumption_entity: undefined,
+      production_energy_entity: "sensor.production",
+    });
+    await standardEditor.updateComplete;
+    expect(
+      standardEditor.shadowRoot?.querySelector(".advanced-toggle")?.getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(
+      standardEditor.shadowRoot?.querySelector('[name="self_consumption_baseline"]'),
+    ).toBeNull();
+    expect(
+      standardEditor.shadowRoot?.querySelector('[name="production_energy_baseline"]'),
+    ).not.toBeNull();
+  });
+
+  it("opens advanced settings on demand", async () => {
+    const editor = await createEditor();
     editor.setConfig({
       ...config,
       self_consumption_entity: undefined,
       production_energy_entity: "sensor.production",
     });
     await editor.updateComplete;
-    expect(editor.shadowRoot?.querySelector('[name="self_consumption_baseline"]')).toBeNull();
-    expect(editor.shadowRoot?.querySelector('[name="production_energy_baseline"]')).not.toBeNull();
+
+    (editor.shadowRoot?.querySelector(".advanced-toggle") as HTMLButtonElement).click();
+    await editor.updateComplete;
+
+    expect(
+      editor.shadowRoot?.querySelector(".advanced-toggle")?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(
+      Array.from(editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? []).some(
+        (picker) =>
+          (picker as HTMLElement & { label?: string }).label === "Self-consumption energy entity",
+      ),
+    ).toBe(true);
+    expect(editor.shadowRoot?.querySelector('[name="use_location_seasonality"]')).not.toBeNull();
   });
 
   it("uses each entity label only inside its picker", async () => {
@@ -858,11 +948,11 @@ describe("configuration editor", () => {
       editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
     ) as Array<HTMLElement & { label?: string }>;
     expect(pickers.map((picker) => picker.label)).toEqual([
-      "Self-consumption energy entity",
       "PV production energy entity",
       "Export energy entity",
+      "Self-consumption energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(16);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(17);
   });
 
   it("emits the complete configuration after an entity changes", async () => {
@@ -874,11 +964,15 @@ describe("configuration editor", () => {
 
     editor.setConfig(config);
     await editor.updateComplete;
-    editor.shadowRoot
-      ?.querySelector("ha-entity-picker")
-      ?.dispatchEvent(
-        new CustomEvent("value-changed", { detail: { value: "sensor.updated_self" } }),
-      );
+    const selfConsumptionPicker = Array.from(
+      editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
+    ).find(
+      (picker) =>
+        (picker as HTMLElement & { label?: string }).label === "Self-consumption energy entity",
+    );
+    selfConsumptionPicker?.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: "sensor.updated_self" } }),
+    );
 
     expect(changes).toEqual([{ ...config, self_consumption_entity: "sensor.updated_self" }]);
   });
@@ -892,9 +986,15 @@ describe("configuration editor", () => {
     editor.setConfig({ ...config, production_energy_entity: "sensor.production" });
     await editor.updateComplete;
 
-    editor.shadowRoot
-      ?.querySelector("ha-entity-picker")
-      ?.dispatchEvent(new CustomEvent("value-changed", { detail: { value: undefined } }));
+    const selfConsumptionPicker = Array.from(
+      editor.shadowRoot?.querySelectorAll("ha-entity-picker") ?? [],
+    ).find(
+      (picker) =>
+        (picker as HTMLElement & { label?: string }).label === "Self-consumption energy entity",
+    );
+    selfConsumptionPicker?.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: undefined } }),
+    );
 
     const expected = { ...config, production_energy_entity: "sensor.production" };
     delete expected.self_consumption_entity;

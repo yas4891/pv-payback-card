@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.2 - 2026-08-31
+
+- Added a collapsible Advanced settings section for direct self-consumption, visibility controls, seasonality, and discounting.
+- Replaced every visible warning and error message with an interactive orange warning indicator and localized details dialog.
+- Split the README configuration reference into Standard configuration and Advanced settings tables.
+
 ## 0.4.1 - 2026-08-31
 
 - Fixed clearing an optional energy entity in the visual editor so production-based configurations can omit direct self-consumption.
