@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.1 - 2026-08-31
+
+- Fixed clearing an optional energy entity in the visual editor so production-based configurations can omit direct self-consumption.
+
 ## 0.4.0 - 2026-08-30
 
 - Added the optional `display_style: compact` layout with localized tooltips and a visual-editor selector.

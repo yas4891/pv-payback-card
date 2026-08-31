@@ -776,9 +776,12 @@ export class PVPaybackCardEditor extends LitElement {
     name: "self_consumption_entity" | "export_energy_entity" | "production_energy_entity",
     event: Event,
   ): void {
-    const value = (event as CustomEvent<{ value?: unknown }>).detail?.value;
-    if (typeof value !== "string") return;
-    this._config = { ...this._config, [name]: value };
+    const rawValue = (event as CustomEvent<{ value?: unknown }>).detail?.value;
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
+    const config = { ...this._config };
+    if (value) config[name] = value;
+    else delete config[name];
+    this._config = config;
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: this._config },

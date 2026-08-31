@@ -882,4 +882,23 @@ describe("configuration editor", () => {
 
     expect(changes).toEqual([{ ...config, self_consumption_entity: "sensor.updated_self" }]);
   });
+
+  it("removes an optional entity after the picker is cleared", async () => {
+    const editor = await createEditor();
+    const changes: Partial<PVPaybackCardConfig>[] = [];
+    editor.addEventListener("config-changed", (event) => {
+      changes.push((event as CustomEvent<{ config: Partial<PVPaybackCardConfig> }>).detail.config);
+    });
+    editor.setConfig({ ...config, production_energy_entity: "sensor.production" });
+    await editor.updateComplete;
+
+    editor.shadowRoot
+      ?.querySelector("ha-entity-picker")
+      ?.dispatchEvent(new CustomEvent("value-changed", { detail: { value: undefined } }));
+
+    const expected = { ...config, production_energy_entity: "sensor.production" };
+    delete expected.self_consumption_entity;
+    expect(changes).toEqual([expected]);
+    expect("self_consumption_entity" in changes[0]).toBe(false);
+  });
 });
