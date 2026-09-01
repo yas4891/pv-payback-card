@@ -41,6 +41,13 @@ export type PVPaybackCardConfig = {
 
 export type StatisticRow = { start?: string | number; start_time?: string; sum?: unknown };
 export type HistoricalStatistics = Record<string, StatisticRow[]>;
+export type HistoryState = {
+  s?: unknown;
+  state?: unknown;
+  lu?: unknown;
+  last_updated?: unknown;
+};
+export type EntityHistory = Record<string, HistoryState[]>;
 export type DailyEnergy = { date: string; selfConsumption: number; exported: number };
 
 type EnergyRead = {
@@ -72,6 +79,7 @@ const DAYS_PER_YEAR = 365.2425;
 const MAXIMUM_FORECAST_DAYS = 366 * 50;
 const WARNING_DELAY_MS = 3 * 60 * 1000;
 const historicalStatisticsCache = new Map<string, Promise<HistoricalStatistics | undefined>>();
+const lastValidHistoryCache = new Map<string, Promise<Record<string, CachedEnergy>>>();
 
 const translations = {
   de: {
@@ -675,6 +683,68 @@ export function cacheKey(config: PVPaybackCardConfig, entity: string): string {
   return `pv-payback-card:last-valid:${scope}:${entity}`;
 }
 
+export function latestValidEnergyFromHistory(
+  states: HistoryState[] | undefined,
+  unit: Unit,
+): CachedEnergy | undefined {
+  if (!states) return undefined;
+  for (let index = states.length - 1; index >= 0; index -= 1) {
+    const state = states[index];
+    const raw = state.s ?? state.state;
+    if ((typeof raw === "string" && raw.trim() === "") || raw === null || raw === undefined)
+      continue;
+    const numeric = typeof raw === "number" ? raw : Number(raw);
+    const value = energyToKwh(numeric, unit);
+    if (value === undefined || value < 0) continue;
+    const timestamp =
+      typeof state.last_updated === "string"
+        ? state.last_updated
+        : typeof state.lu === "number" && Number.isFinite(state.lu)
+          ? new Date(state.lu * 1000).toISOString()
+          : undefined;
+    return { value, timestamp };
+  }
+  return undefined;
+}
+
+export function loadLastValidEnergyHistory(
+  hass: Pick<HomeAssistant, "callWS">,
+  entities: Record<string, Unit>,
+  now = new Date(),
+): Promise<Record<string, CachedEnergy>> | undefined {
+  const entityIds = Object.keys(entities).sort();
+  if (!hass.callWS || entityIds.length === 0 || Number.isNaN(now.getTime())) return undefined;
+  const cacheWindow = Math.floor(now.getTime() / (5 * 60 * 1000));
+  const key = JSON.stringify([entityIds, cacheWindow]);
+  const existing = lastValidHistoryCache.get(key);
+  if (existing) return existing;
+  const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const request = hass
+    .callWS({
+      type: "history/history_during_period",
+      start_time: start.toISOString(),
+      end_time: now.toISOString(),
+      entity_ids: entityIds,
+      include_start_time_state: true,
+      significant_changes_only: true,
+      minimal_response: true,
+      no_attributes: true,
+    })
+    .then((response) => {
+      if (!response || typeof response !== "object") return {};
+      const history = response as EntityHistory;
+      return Object.fromEntries(
+        entityIds.flatMap((entityId) => {
+          const value = latestValidEnergyFromHistory(history[entityId], entities[entityId]);
+          return value ? [[entityId, value] as const] : [];
+        }),
+      );
+    })
+    .catch(() => ({}));
+  lastValidHistoryCache.set(key, request);
+  return request;
+}
+
 export function parseCachedEnergy(raw: string | null): CachedEnergy | undefined {
   if (!raw) return undefined;
   try {
@@ -1042,6 +1112,7 @@ export class PVPaybackCard extends LitElement {
     this._config = withDisplayDefaults(config);
     this._historicalStatistics = undefined;
     this._historicalStatisticsKey = undefined;
+    this._historyRecoveryKey = undefined;
     this._calculationCache = undefined;
     this._scenarioCalculationCache = undefined;
     this.resetWarningDelay();
@@ -1049,6 +1120,7 @@ export class PVPaybackCard extends LitElement {
 
   private _historicalStatistics?: HistoricalStatistics;
   private _historicalStatisticsKey?: string;
+  private _historyRecoveryKey?: string;
   private _calculationCache?: { key: string; calculation: Calculation };
   private _scenarioCalculationCache?: { key: string; scenarios: ScenarioCalculations };
   private _comparisonDiscountRate = 3;
@@ -1104,23 +1176,58 @@ export class PVPaybackCard extends LitElement {
 
   protected updated(): void {
     const config = this._config;
-    if (
-      !config ||
-      !this.hass?.callWS ||
-      !appliesAnnualDiscount(config) ||
-      (config.annual_discount_rate ?? 0) <= 0
-    )
-      return;
-    const completedEnd = calendarDay(new Date());
-    completedEnd.setDate(completedEnd.getDate() - 1);
-    const key = historicalStatisticsCacheKey(config, dateKey(completedEnd));
-    if (this._historicalStatisticsKey === key) return;
-    this._historicalStatisticsKey = key;
-    loadHistoricalStatistics(this.hass, config)?.then((statistics) => {
-      if (statistics && this._historicalStatisticsKey === key) {
-        this._historicalStatistics = statistics;
-        this.requestUpdate();
+    if (!config || !this.hass?.callWS) return;
+    if (appliesAnnualDiscount(config) && (config.annual_discount_rate ?? 0) > 0) {
+      const completedEnd = calendarDay(new Date());
+      completedEnd.setDate(completedEnd.getDate() - 1);
+      const key = historicalStatisticsCacheKey(config, dateKey(completedEnd));
+      if (this._historicalStatisticsKey !== key) {
+        this._historicalStatisticsKey = key;
+        loadHistoricalStatistics(this.hass, config)?.then((statistics) => {
+          if (statistics && this._historicalStatisticsKey === key) {
+            this._historicalStatistics = statistics;
+            this.requestUpdate();
+          }
+        });
       }
+    }
+    this.recoverMissingEnergyFromHistory(config);
+  }
+
+  private recoverMissingEnergyFromHistory(config: PVPaybackCardConfig): void {
+    if (!this.hass?.callWS) return;
+    const entityIds = config.self_consumption_entity
+      ? [config.self_consumption_entity, config.export_energy_entity]
+      : [config.production_energy_entity, config.export_energy_entity].filter(
+          (entityId): entityId is string => Boolean(entityId),
+        );
+    const missing: Record<string, Unit> = {};
+    for (const entityId of entityIds) {
+      const state = this.hass.states[entityId];
+      const unit = state?.attributes?.unit_of_measurement;
+      if (!isUnit(unit)) continue;
+      const numeric = Number(state.state);
+      const current = energyToKwh(numeric, unit);
+      const cached = readCachedEnergy(localStorage, cacheKey(config, entityId));
+      if (current === undefined && cached === undefined) missing[entityId] = unit;
+    }
+    const recoveryKey = JSON.stringify(
+      Object.keys(missing)
+        .sort()
+        .map((entityId) => cacheKey(config, entityId)),
+    );
+    if (Object.keys(missing).length === 0 || this._historyRecoveryKey === recoveryKey) return;
+    this._historyRecoveryKey = recoveryKey;
+    loadLastValidEnergyHistory(this.hass, missing)?.then((values) => {
+      if (this._historyRecoveryKey !== recoveryKey) return;
+      for (const [entityId, value] of Object.entries(values)) {
+        try {
+          localStorage.setItem(cacheKey(config, entityId), JSON.stringify(value));
+        } catch {
+          // Storage can be blocked in privacy-restricted browser contexts.
+        }
+      }
+      if (Object.keys(values).length > 0) this.requestUpdate();
     });
   }
 

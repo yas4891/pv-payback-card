@@ -8,7 +8,7 @@ PV Payback Card is a custom Lovelace card for [Home Assistant](https://www.home-
 
 The card calculates the financial benefit directly in the browser. It needs no companion integration and no vendor-specific inverter integration. Configure cumulative production and export energy entities, or a direct self-consumption entity when available.
 
-The card accepts `Wh`, `kWh`, and `MWh` sensors. It also preserves the latest valid reading during a temporary overnight `unknown` or `unavailable` state.
+The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid reading during a temporary overnight `unknown` or `unavailable` state. When the browser cache is empty, the card can restore that reading from Home Assistant recorder history.
 
 ## Screenshots
 
@@ -147,7 +147,7 @@ The card calculates the benefit as self-consumed energy times `electricity_price
 
 See [Seasonality and discounting](https://github.com/yas4891/pv-payback-card/wiki/Seasonality-and-discounting) for configuration, calculation details, recorder usage, and limitations.
 
-During a temporary `unknown` or `unavailable` state, the card uses the latest valid browser-stored reading. It visibly marks cached data and never treats a missing value as zero.
+During a temporary `unknown` or `unavailable` state, the card uses the latest valid browser-stored reading. When no browser-stored reading exists, it requests the previous 24 hours from Home Assistant recorder history. The request includes the state immediately before that period. The card saves the newest valid historical reading in the browser and never treats a missing value as zero. This fallback needs recorder history for the configured entity.
 
 If a cumulative counter briefly reports a lower value, the card keeps the higher cached value. It displays a localized warning that names the affected entity. Changing the selected input model, entities, date, or baselines starts a separate cache scope.
 

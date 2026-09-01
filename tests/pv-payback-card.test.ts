@@ -11,7 +11,9 @@ import {
   dailyEnergyFromStatistics,
   displayName,
   energyToKwh,
+  latestValidEnergyFromHistory,
   loadHistoricalStatistics,
+  loadLastValidEnergyHistory,
   parseCachedEnergy,
   readCachedEnergy,
   statisticDailyDeltas,
@@ -544,6 +546,89 @@ describe("historical daily statistics", () => {
 });
 
 describe("last valid energy cache", () => {
+  it("finds the newest numeric value in compressed Home Assistant history", () => {
+    expect(
+      latestValidEnergyFromHistory(
+        [
+          { s: "1200", lu: 1_767_873_600 },
+          { s: "unavailable", lu: 1_767_877_200 },
+          { s: "unknown", lu: 1_767_880_800 },
+        ],
+        "Wh",
+      ),
+    ).toEqual({ value: 1.2, timestamp: "2026-01-08T12:00:00.000Z" });
+  });
+
+  it("loads a small recorder window for missing energy entities", async () => {
+    const requests: Record<string, unknown>[] = [];
+    const result = await loadLastValidEnergyHistory(
+      {
+        callWS: async (request) => {
+          requests.push(request);
+          return {
+            "sensor.history_own": [
+              { s: "123.4", lu: 1_767_873_600 },
+              { s: "unavailable", lu: 1_767_877_200 },
+            ],
+          };
+        },
+      },
+      { "sensor.history_own": "kWh" },
+      new Date("2026-01-10T12:00:00.000Z"),
+    );
+
+    expect(result).toEqual({
+      "sensor.history_own": { value: 123.4, timestamp: "2026-01-08T12:00:00.000Z" },
+    });
+    expect(requests).toEqual([
+      {
+        type: "history/history_during_period",
+        start_time: "2026-01-09T12:00:00.000Z",
+        end_time: "2026-01-10T12:00:00.000Z",
+        entity_ids: ["sensor.history_own"],
+        include_start_time_state: true,
+        significant_changes_only: true,
+        minimal_response: true,
+        no_attributes: true,
+      },
+    ]);
+  });
+
+  it("persists recorder history when an unavailable entity has no browser cache", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    const historyConfig = { ...config, self_consumption_entity: "sensor.history_recovery" };
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.history_recovery": {
+          state: "unavailable",
+          attributes: { unit_of_measurement: "kWh" },
+        },
+        "sensor.export": { state: "50", attributes: { unit_of_measurement: "kWh" } },
+      },
+      callWS: async () => ({
+        "sensor.history_recovery": [{ s: "123.4", lu: 1_767_873_600 }],
+      }),
+      locale: { language: "en" },
+      config: { currency: "EUR" },
+    };
+    card.setConfig(historyConfig);
+    document.body.append(card);
+
+    await vi.waitFor(() =>
+      expect(
+        readCachedEnergy(localStorage, cacheKey(historyConfig, "sensor.history_recovery")),
+      ).toEqual({ value: 123.4, timestamp: "2026-01-08T12:00:00.000Z" }),
+    );
+
+    card.remove();
+    vi.unstubAllGlobals();
+  });
+
   it("uses a persisted value when the current entity is unavailable after reload", () => {
     const cached = parseCachedEnergy('{"value":123.4,"timestamp":"2026-01-10T12:00:00Z"}');
     expect(chooseEnergyValue(undefined, cached)).toEqual({

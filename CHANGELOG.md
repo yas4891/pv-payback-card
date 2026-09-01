@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.3 - 2026-08-31
+
+- Restored the latest valid cumulative energy reading from Home Assistant recorder history when the browser cache is empty.
+- Limited history recovery to a compact one-day request made only for unavailable required entities.
+
 ## 0.4.2 - 2026-08-31
 
 - Added a collapsible Advanced settings section for direct self-consumption, visibility controls, seasonality, and discounting.
