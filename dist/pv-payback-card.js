@@ -525,9 +525,9 @@ const ot = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     locationFallback: "Der Home-Assistant-Standort fehlt. Die saisonalen Szenarien verwenden deshalb die lineare Prognose.",
     close: "Schließen",
     relativeYear: "Jahr",
-    relativeYears: "Jahre",
+    relativeYears: "Jahren",
     relativeMonth: "Monat",
-    relativeMonths: "Monate",
+    relativeMonths: "Monaten",
     relativeIn: "in",
     relativeThisMonth: "diesen Monat",
     relativeOverdue: "überfällig"
