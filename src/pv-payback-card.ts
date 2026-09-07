@@ -115,6 +115,7 @@ const translations = {
     relativeMonth: "Monat",
     relativeMonths: "Monaten",
     relativeIn: "in",
+    relativeAfter: "nach",
     relativeThisMonth: "diesen Monat",
     relativeOverdue: "überfällig",
   },
@@ -149,6 +150,7 @@ const translations = {
     relativeMonth: "month",
     relativeMonths: "months",
     relativeIn: "in",
+    relativeAfter: "after",
     relativeThisMonth: "this month",
     relativeOverdue: "overdue",
   },
@@ -1381,7 +1383,7 @@ export class PVPaybackCard extends LitElement {
       : "—";
   }
 
-  private formatRelativeDate(date: Date | undefined, referenceDate: Date): string {
+  private formatRelativeDate(date: Date | undefined, referenceDate: Date, fromStartDate: boolean): string {
     if (!date) return "—";
     const t = this.text();
     const startDay = calendarDay(referenceDate);
@@ -1397,7 +1399,7 @@ export class PVPaybackCard extends LitElement {
     if (years > 0) parts.push(`${years} ${years === 1 ? t.relativeYear : t.relativeYears}`);
     if (months > 0) parts.push(`${months} ${months === 1 ? t.relativeMonth : t.relativeMonths}`);
     if (parts.length === 0) return t.relativeThisMonth;
-    return `${t.relativeIn} ${parts.join(", ")}`;
+    return `${fromStartDate ? t.relativeAfter : t.relativeIn} ${parts.join(", ")}`;
   }
 
   private relativeReferenceDate(now: Date): Date {
@@ -1409,9 +1411,9 @@ export class PVPaybackCard extends LitElement {
   }
 
   private formatPaybackDate(date: Date | undefined, now: Date): string {
-    return this._config?.payback_date_format === "relative"
-      ? this.formatRelativeDate(date, this.relativeReferenceDate(now))
-      : this.formatDate(date);
+    if (this._config?.payback_date_format !== "relative") return this.formatDate(date);
+    const fromStartDate = this._config?.payback_date_relative_reference === "start_date";
+    return this.formatRelativeDate(date, this.relativeReferenceDate(now), fromStartDate);
   }
 
   private formatPercentage(value: number): string {

@@ -529,6 +529,7 @@ const ot = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     relativeMonth: "Monat",
     relativeMonths: "Monaten",
     relativeIn: "in",
+    relativeAfter: "nach",
     relativeThisMonth: "diesen Monat",
     relativeOverdue: "überfällig"
   },
@@ -561,6 +562,7 @@ const ot = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     relativeMonth: "month",
     relativeMonths: "months",
     relativeIn: "in",
+    relativeAfter: "after",
     relativeThisMonth: "this month",
     relativeOverdue: "overdue"
   }
@@ -1359,12 +1361,12 @@ class At extends T {
       dateStyle: "medium"
     }).format(e) : "—";
   }
-  formatRelativeDate(e, t) {
+  formatRelativeDate(e, t, n) {
     if (!e) return "—";
-    const n = this.text(), s = x(t), a = x(e);
-    if (a.getTime() <= s.getTime()) return n.relativeOverdue;
-    const r = (a.getFullYear() - s.getFullYear()) * 12 + (a.getMonth() - s.getMonth()) - (a.getDate() < s.getDate() ? 1 : 0), o = Math.floor(r / 12), c = r % 12, l = [];
-    return o > 0 && l.push(`${o} ${o === 1 ? n.relativeYear : n.relativeYears}`), c > 0 && l.push(`${c} ${c === 1 ? n.relativeMonth : n.relativeMonths}`), l.length === 0 ? n.relativeThisMonth : `${n.relativeIn} ${l.join(", ")}`;
+    const s = this.text(), a = x(t), r = x(e);
+    if (r.getTime() <= a.getTime()) return s.relativeOverdue;
+    const o = (r.getFullYear() - a.getFullYear()) * 12 + (r.getMonth() - a.getMonth()) - (r.getDate() < a.getDate() ? 1 : 0), c = Math.floor(o / 12), l = o % 12, u = [];
+    return c > 0 && u.push(`${c} ${c === 1 ? s.relativeYear : s.relativeYears}`), l > 0 && u.push(`${l} ${l === 1 ? s.relativeMonth : s.relativeMonths}`), u.length === 0 ? s.relativeThisMonth : `${n ? s.relativeAfter : s.relativeIn} ${u.join(", ")}`;
   }
   relativeReferenceDate(e) {
     if (this._config?.payback_date_relative_reference === "start_date") {
@@ -1374,7 +1376,9 @@ class At extends T {
     return e;
   }
   formatPaybackDate(e, t) {
-    return this._config?.payback_date_format === "relative" ? this.formatRelativeDate(e, this.relativeReferenceDate(t)) : this.formatDate(e);
+    if (this._config?.payback_date_format !== "relative") return this.formatDate(e);
+    const n = this._config?.payback_date_relative_reference === "start_date";
+    return this.formatRelativeDate(e, this.relativeReferenceDate(t), n);
   }
   formatPercentage(e) {
     return new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
