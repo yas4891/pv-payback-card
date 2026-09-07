@@ -1,5 +1,5 @@
-const B = globalThis, ie = B.ShadowRoot && (B.ShadyCSS === void 0 || B.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, se = /* @__PURE__ */ Symbol(), ue = /* @__PURE__ */ new WeakMap();
-let De = class {
+const B = globalThis, ne = B.ShadowRoot && (B.ShadyCSS === void 0 || B.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, se = /* @__PURE__ */ Symbol(), ue = /* @__PURE__ */ new WeakMap();
+let Ee = class {
   constructor(e, t, n) {
     if (this._$cssResult$ = !0, n !== se) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
     this.cssText = e, this.t = t;
@@ -7,7 +7,7 @@ let De = class {
   get styleSheet() {
     let e = this.o;
     const t = this.t;
-    if (ie && e === void 0) {
+    if (ne && e === void 0) {
       const n = t !== void 0 && t.length === 1;
       n && (e = ue.get(t)), e === void 0 && ((this.o = e = new CSSStyleSheet()).replaceSync(this.cssText), n && ue.set(t, e));
     }
@@ -17,28 +17,28 @@ let De = class {
     return this.cssText;
   }
 };
-const Ve = (i) => new De(typeof i == "string" ? i : i + "", void 0, se), Ce = (i, ...e) => {
-  const t = i.length === 1 ? i[0] : e.reduce((n, s, a) => n + ((o) => {
-    if (o._$cssResult$ === !0) return o.cssText;
-    if (typeof o == "number") return o;
-    throw Error("Value passed to 'css' function must be a 'css' function result: " + o + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
+const Ve = (i) => new Ee(typeof i == "string" ? i : i + "", void 0, se), Me = (i, ...e) => {
+  const t = i.length === 1 ? i[0] : e.reduce((n, s, a) => n + ((r) => {
+    if (r._$cssResult$ === !0) return r.cssText;
+    if (typeof r == "number") return r;
+    throw Error("Value passed to 'css' function must be a 'css' function result: " + r + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
   })(s) + i[a + 1], i[0]);
-  return new De(t, i, se);
+  return new Ee(t, i, se);
 }, ze = (i, e) => {
-  if (ie) i.adoptedStyleSheets = e.map((t) => t instanceof CSSStyleSheet ? t : t.styleSheet);
+  if (ne) i.adoptedStyleSheets = e.map((t) => t instanceof CSSStyleSheet ? t : t.styleSheet);
   else for (const t of e) {
     const n = document.createElement("style"), s = B.litNonce;
     s !== void 0 && n.setAttribute("nonce", s), n.textContent = t.cssText, i.appendChild(n);
   }
-}, he = ie ? (i) => i : (i) => i instanceof CSSStyleSheet ? ((e) => {
+}, he = ne ? (i) => i : (i) => i instanceof CSSStyleSheet ? ((e) => {
   let t = "";
   for (const n of e.cssRules) t += n.cssText;
   return Ve(t);
 })(i) : i;
-const { is: He, defineProperty: je, getOwnPropertyDescriptor: Ke, getOwnPropertyNames: Ie, getOwnPropertySymbols: Be, getPrototypeOf: Le } = Object, J = globalThis, pe = J.trustedTypes, qe = pe ? pe.emptyScript : "", Je = J.reactiveElementPolyfillSupport, z = (i, e) => i, te = { toAttribute(i, e) {
+const { is: He, defineProperty: je, getOwnPropertyDescriptor: Ke, getOwnPropertyNames: Ie, getOwnPropertySymbols: Be, getPrototypeOf: Le } = Object, q = globalThis, pe = q.trustedTypes, Ye = pe ? pe.emptyScript : "", qe = q.reactiveElementPolyfillSupport, z = (i, e) => i, te = { toAttribute(i, e) {
   switch (e) {
     case Boolean:
-      i = i ? qe : null;
+      i = i ? Ye : null;
       break;
     case Object:
     case Array:
@@ -63,8 +63,8 @@ const { is: He, defineProperty: je, getOwnPropertyDescriptor: Ke, getOwnProperty
       }
   }
   return t;
-} }, Me = (i, e) => !He(i, e), _e = { attribute: !0, type: String, converter: te, reflect: !1, useDefault: !1, hasChanged: Me };
-Symbol.metadata ??= /* @__PURE__ */ Symbol("metadata"), J.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
+} }, Ce = (i, e) => !He(i, e), _e = { attribute: !0, type: String, converter: te, reflect: !1, useDefault: !1, hasChanged: Ce };
+Symbol.metadata ??= /* @__PURE__ */ Symbol("metadata"), q.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
 let N = class extends HTMLElement {
   static addInitializer(e) {
     this._$Ei(), (this.l ??= []).push(e);
@@ -81,12 +81,12 @@ let N = class extends HTMLElement {
   static getPropertyDescriptor(e, t, n) {
     const { get: s, set: a } = Ke(this.prototype, e) ?? { get() {
       return this[t];
-    }, set(o) {
-      this[t] = o;
+    }, set(r) {
+      this[t] = r;
     } };
-    return { get: s, set(o) {
-      const r = s?.call(this);
-      a?.call(this, o), this.requestUpdate(e, r, n);
+    return { get: s, set(r) {
+      const o = s?.call(this);
+      a?.call(this, r), this.requestUpdate(e, o, n);
     }, configurable: !0, enumerable: !0 };
   }
   static getPropertyOptions(e) {
@@ -169,22 +169,22 @@ let N = class extends HTMLElement {
   _$AK(e, t) {
     const n = this.constructor, s = n._$Eh.get(e);
     if (s !== void 0 && this._$Em !== s) {
-      const a = n.getPropertyOptions(s), o = typeof a.converter == "function" ? { fromAttribute: a.converter } : a.converter?.fromAttribute !== void 0 ? a.converter : te;
+      const a = n.getPropertyOptions(s), r = typeof a.converter == "function" ? { fromAttribute: a.converter } : a.converter?.fromAttribute !== void 0 ? a.converter : te;
       this._$Em = s;
-      const r = o.fromAttribute(t, a.type);
-      this[s] = r ?? this._$Ej?.get(s) ?? r, this._$Em = null;
+      const o = r.fromAttribute(t, a.type);
+      this[s] = o ?? this._$Ej?.get(s) ?? o, this._$Em = null;
     }
   }
   requestUpdate(e, t, n, s = !1, a) {
     if (e !== void 0) {
-      const o = this.constructor;
-      if (s === !1 && (a = this[e]), n ??= o.getPropertyOptions(e), !((n.hasChanged ?? Me)(a, t) || n.useDefault && n.reflect && a === this._$Ej?.get(e) && !this.hasAttribute(o._$Eu(e, n)))) return;
+      const r = this.constructor;
+      if (s === !1 && (a = this[e]), n ??= r.getPropertyOptions(e), !((n.hasChanged ?? Ce)(a, t) || n.useDefault && n.reflect && a === this._$Ej?.get(e) && !this.hasAttribute(r._$Eu(e, n)))) return;
       this.C(e, t, n);
     }
     this.isUpdatePending === !1 && (this._$ES = this._$EP());
   }
-  C(e, t, { useDefault: n, reflect: s, wrapped: a }, o) {
-    n && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(e) && (this._$Ej.set(e, o ?? t ?? this[e]), a !== !0 || o !== void 0) || (this._$AL.has(e) || (this.hasUpdated || n || (t = void 0), this._$AL.set(e, t)), s === !0 && this._$Em !== e && (this._$Eq ??= /* @__PURE__ */ new Set()).add(e));
+  C(e, t, { useDefault: n, reflect: s, wrapped: a }, r) {
+    n && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(e) && (this._$Ej.set(e, r ?? t ?? this[e]), a !== !0 || r !== void 0) || (this._$AL.has(e) || (this.hasUpdated || n || (t = void 0), this._$AL.set(e, t)), s === !0 && this._$Em !== e && (this._$Eq ??= /* @__PURE__ */ new Set()).add(e));
   }
   async _$EP() {
     this.isUpdatePending = !0;
@@ -208,8 +208,8 @@ let N = class extends HTMLElement {
       }
       const n = this.constructor.elementProperties;
       if (n.size > 0) for (const [s, a] of n) {
-        const { wrapped: o } = a, r = this[s];
-        o !== !0 || this._$AL.has(s) || r === void 0 || this.C(s, void 0, a, r);
+        const { wrapped: r } = a, o = this[s];
+        r !== !0 || this._$AL.has(s) || o === void 0 || this.C(s, void 0, a, o);
       }
     }
     let e = !1;
@@ -246,23 +246,23 @@ let N = class extends HTMLElement {
   firstUpdated(e) {
   }
 };
-N.elementStyles = [], N.shadowRootOptions = { mode: "open" }, N[z("elementProperties")] = /* @__PURE__ */ new Map(), N[z("finalized")] = /* @__PURE__ */ new Map(), Je?.({ ReactiveElement: N }), (J.reactiveElementVersions ??= []).push("2.1.2");
-const ae = globalThis, ge = (i) => i, q = ae.trustedTypes, me = q ? q.createPolicy("lit-html", { createHTML: (i) => i }) : void 0, Ne = "$lit$", A = `lit$${Math.random().toFixed(9).slice(2)}$`, Te = "?" + A, Ye = `<${Te}>`, M = document, H = () => M.createComment(""), j = (i) => i === null || typeof i != "object" && typeof i != "function", oe = Array.isArray, Ze = (i) => oe(i) || typeof i?.[Symbol.iterator] == "function", X = `[ 	
-\f\r]`, U = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, ye = /-->/g, fe = />/g, D = RegExp(`>|${X}(?:([^\\s"'>=/]+)(${X}*=${X}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), ve = /'/g, be = /"/g, Pe = /^(?:script|style|textarea|title)$/i, Ge = (i) => (e, ...t) => ({ _$litType$: i, strings: e, values: t }), f = Ge(1), O = /* @__PURE__ */ Symbol.for("lit-noChange"), h = /* @__PURE__ */ Symbol.for("lit-nothing"), $e = /* @__PURE__ */ new WeakMap(), C = M.createTreeWalker(M, 129);
+N.elementStyles = [], N.shadowRootOptions = { mode: "open" }, N[z("elementProperties")] = /* @__PURE__ */ new Map(), N[z("finalized")] = /* @__PURE__ */ new Map(), qe?.({ ReactiveElement: N }), (q.reactiveElementVersions ??= []).push("2.1.2");
+const ae = globalThis, ge = (i) => i, Y = ae.trustedTypes, me = Y ? Y.createPolicy("lit-html", { createHTML: (i) => i }) : void 0, Ne = "$lit$", S = `lit$${Math.random().toFixed(9).slice(2)}$`, Te = "?" + S, Je = `<${Te}>`, C = document, H = () => C.createComment(""), j = (i) => i === null || typeof i != "object" && typeof i != "function", re = Array.isArray, Ze = (i) => re(i) || typeof i?.[Symbol.iterator] == "function", X = `[ 	
+\f\r]`, U = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, ye = /-->/g, fe = />/g, E = RegExp(`>|${X}(?:([^\\s"'>=/]+)(${X}*=${X}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`, "g"), ve = /'/g, be = /"/g, Pe = /^(?:script|style|textarea|title)$/i, Ge = (i) => (e, ...t) => ({ _$litType$: i, strings: e, values: t }), f = Ge(1), O = /* @__PURE__ */ Symbol.for("lit-noChange"), h = /* @__PURE__ */ Symbol.for("lit-nothing"), $e = /* @__PURE__ */ new WeakMap(), M = C.createTreeWalker(C, 129);
 function Oe(i, e) {
-  if (!oe(i) || !i.hasOwnProperty("raw")) throw Error("invalid template strings array");
+  if (!re(i) || !i.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return me !== void 0 ? me.createHTML(e) : e;
 }
 const Xe = (i, e) => {
   const t = i.length - 1, n = [];
-  let s, a = e === 2 ? "<svg>" : e === 3 ? "<math>" : "", o = U;
-  for (let r = 0; r < t; r++) {
-    const c = i[r];
+  let s, a = e === 2 ? "<svg>" : e === 3 ? "<math>" : "", r = U;
+  for (let o = 0; o < t; o++) {
+    const c = i[o];
     let l, u, d = -1, p = 0;
-    for (; p < c.length && (o.lastIndex = p, u = o.exec(c), u !== null); ) p = o.lastIndex, o === U ? u[1] === "!--" ? o = ye : u[1] !== void 0 ? o = fe : u[2] !== void 0 ? (Pe.test(u[2]) && (s = RegExp("</" + u[2], "g")), o = D) : u[3] !== void 0 && (o = D) : o === D ? u[0] === ">" ? (o = s ?? U, d = -1) : u[1] === void 0 ? d = -2 : (d = o.lastIndex - u[2].length, l = u[1], o = u[3] === void 0 ? D : u[3] === '"' ? be : ve) : o === be || o === ve ? o = D : o === ye || o === fe ? o = U : (o = D, s = void 0);
-    const _ = o === D && i[r + 1].startsWith("/>") ? " " : "";
-    a += o === U ? c + Ye : d >= 0 ? (n.push(l), c.slice(0, d) + Ne + c.slice(d) + A + _) : c + A + (d === -2 ? r : _);
+    for (; p < c.length && (r.lastIndex = p, u = r.exec(c), u !== null); ) p = r.lastIndex, r === U ? u[1] === "!--" ? r = ye : u[1] !== void 0 ? r = fe : u[2] !== void 0 ? (Pe.test(u[2]) && (s = RegExp("</" + u[2], "g")), r = E) : u[3] !== void 0 && (r = E) : r === E ? u[0] === ">" ? (r = s ?? U, d = -1) : u[1] === void 0 ? d = -2 : (d = r.lastIndex - u[2].length, l = u[1], r = u[3] === void 0 ? E : u[3] === '"' ? be : ve) : r === be || r === ve ? r = E : r === ye || r === fe ? r = U : (r = E, s = void 0);
+    const _ = r === E && i[o + 1].startsWith("/>") ? " " : "";
+    a += r === U ? c + Je : d >= 0 ? (n.push(l), c.slice(0, d) + Ne + c.slice(d) + S + _) : c + S + (d === -2 ? o : _);
   }
   return [Oe(i, a + (i[t] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), n];
 };
@@ -270,36 +270,36 @@ class K {
   constructor({ strings: e, _$litType$: t }, n) {
     let s;
     this.parts = [];
-    let a = 0, o = 0;
-    const r = e.length - 1, c = this.parts, [l, u] = Xe(e, t);
-    if (this.el = K.createElement(l, n), C.currentNode = this.el.content, t === 2 || t === 3) {
+    let a = 0, r = 0;
+    const o = e.length - 1, c = this.parts, [l, u] = Xe(e, t);
+    if (this.el = K.createElement(l, n), M.currentNode = this.el.content, t === 2 || t === 3) {
       const d = this.el.content.firstChild;
       d.replaceWith(...d.childNodes);
     }
-    for (; (s = C.nextNode()) !== null && c.length < r; ) {
+    for (; (s = M.nextNode()) !== null && c.length < o; ) {
       if (s.nodeType === 1) {
         if (s.hasAttributes()) for (const d of s.getAttributeNames()) if (d.endsWith(Ne)) {
-          const p = u[o++], _ = s.getAttribute(d).split(A), g = /([.?@])?(.*)/.exec(p);
-          c.push({ type: 1, index: a, name: g[2], strings: _, ctor: g[1] === "." ? et : g[1] === "?" ? tt : g[1] === "@" ? nt : Y }), s.removeAttribute(d);
-        } else d.startsWith(A) && (c.push({ type: 6, index: a }), s.removeAttribute(d));
+          const p = u[r++], _ = s.getAttribute(d).split(S), g = /([.?@])?(.*)/.exec(p);
+          c.push({ type: 1, index: a, name: g[2], strings: _, ctor: g[1] === "." ? et : g[1] === "?" ? tt : g[1] === "@" ? it : J }), s.removeAttribute(d);
+        } else d.startsWith(S) && (c.push({ type: 6, index: a }), s.removeAttribute(d));
         if (Pe.test(s.tagName)) {
-          const d = s.textContent.split(A), p = d.length - 1;
+          const d = s.textContent.split(S), p = d.length - 1;
           if (p > 0) {
-            s.textContent = q ? q.emptyScript : "";
-            for (let _ = 0; _ < p; _++) s.append(d[_], H()), C.nextNode(), c.push({ type: 2, index: ++a });
+            s.textContent = Y ? Y.emptyScript : "";
+            for (let _ = 0; _ < p; _++) s.append(d[_], H()), M.nextNode(), c.push({ type: 2, index: ++a });
             s.append(d[p], H());
           }
         }
       } else if (s.nodeType === 8) if (s.data === Te) c.push({ type: 2, index: a });
       else {
         let d = -1;
-        for (; (d = s.data.indexOf(A, d + 1)) !== -1; ) c.push({ type: 7, index: a }), d += A.length - 1;
+        for (; (d = s.data.indexOf(S, d + 1)) !== -1; ) c.push({ type: 7, index: a }), d += S.length - 1;
       }
       a++;
     }
   }
   static createElement(e, t) {
-    const n = M.createElement("template");
+    const n = C.createElement("template");
     return n.innerHTML = e, n;
   }
 }
@@ -320,17 +320,17 @@ class Qe {
     return this._$AM._$AU;
   }
   u(e) {
-    const { el: { content: t }, parts: n } = this._$AD, s = (e?.creationScope ?? M).importNode(t, !0);
-    C.currentNode = s;
-    let a = C.nextNode(), o = 0, r = 0, c = n[0];
+    const { el: { content: t }, parts: n } = this._$AD, s = (e?.creationScope ?? C).importNode(t, !0);
+    M.currentNode = s;
+    let a = M.nextNode(), r = 0, o = 0, c = n[0];
     for (; c !== void 0; ) {
-      if (o === c.index) {
+      if (r === c.index) {
         let l;
-        c.type === 2 ? l = new I(a, a.nextSibling, this, e) : c.type === 1 ? l = new c.ctor(a, c.name, c.strings, this, e) : c.type === 6 && (l = new it(a, this, e)), this._$AV.push(l), c = n[++r];
+        c.type === 2 ? l = new I(a, a.nextSibling, this, e) : c.type === 1 ? l = new c.ctor(a, c.name, c.strings, this, e) : c.type === 6 && (l = new nt(a, this, e)), this._$AV.push(l), c = n[++o];
       }
-      o !== c?.index && (a = C.nextNode(), o++);
+      r !== c?.index && (a = M.nextNode(), r++);
     }
-    return C.currentNode = M, s;
+    return M.currentNode = C, s;
   }
   p(e) {
     let t = 0;
@@ -365,14 +365,14 @@ class I {
     this._$AH !== e && (this._$AR(), this._$AH = this.O(e));
   }
   _(e) {
-    this._$AH !== h && j(this._$AH) ? this._$AA.nextSibling.data = e : this.T(M.createTextNode(e)), this._$AH = e;
+    this._$AH !== h && j(this._$AH) ? this._$AA.nextSibling.data = e : this.T(C.createTextNode(e)), this._$AH = e;
   }
   $(e) {
     const { values: t, _$litType$: n } = e, s = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = K.createElement(Oe(n.h, n.h[0]), this.options)), n);
     if (this._$AH?._$AD === s) this._$AH.p(t);
     else {
-      const a = new Qe(s, this), o = a.u(this.options);
-      a.p(t), this.T(o), this._$AH = a;
+      const a = new Qe(s, this), r = a.u(this.options);
+      a.p(t), this.T(r), this._$AH = a;
     }
   }
   _$AC(e) {
@@ -380,7 +380,7 @@ class I {
     return t === void 0 && $e.set(e.strings, t = new K(e)), t;
   }
   k(e) {
-    oe(this._$AH) || (this._$AH = [], this._$AR());
+    re(this._$AH) || (this._$AH = [], this._$AR());
     const t = this._$AH;
     let n, s = 0;
     for (const a of e) s === t.length ? t.push(n = new I(this.O(H()), this.O(H()), this, this.options)) : n = t[s], n._$AI(a), s++;
@@ -396,7 +396,7 @@ class I {
     this._$AM === void 0 && (this._$Cv = e, this._$AP?.(e));
   }
 }
-class Y {
+class J {
   get tagName() {
     return this.element.tagName;
   }
@@ -408,20 +408,20 @@ class Y {
   }
   _$AI(e, t = this, n, s) {
     const a = this.strings;
-    let o = !1;
-    if (a === void 0) e = W(this, e, t, 0), o = !j(e) || e !== this._$AH && e !== O, o && (this._$AH = e);
+    let r = !1;
+    if (a === void 0) e = W(this, e, t, 0), r = !j(e) || e !== this._$AH && e !== O, r && (this._$AH = e);
     else {
-      const r = e;
+      const o = e;
       let c, l;
-      for (e = a[0], c = 0; c < a.length - 1; c++) l = W(this, r[n + c], t, c), l === O && (l = this._$AH[c]), o ||= !j(l) || l !== this._$AH[c], l === h ? e = h : e !== h && (e += (l ?? "") + a[c + 1]), this._$AH[c] = l;
+      for (e = a[0], c = 0; c < a.length - 1; c++) l = W(this, o[n + c], t, c), l === O && (l = this._$AH[c]), r ||= !j(l) || l !== this._$AH[c], l === h ? e = h : e !== h && (e += (l ?? "") + a[c + 1]), this._$AH[c] = l;
     }
-    o && !s && this.j(e);
+    r && !s && this.j(e);
   }
   j(e) {
     e === h ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
   }
 }
-class et extends Y {
+class et extends J {
   constructor() {
     super(...arguments), this.type = 3;
   }
@@ -429,7 +429,7 @@ class et extends Y {
     this.element[this.name] = e === h ? void 0 : e;
   }
 }
-class tt extends Y {
+class tt extends J {
   constructor() {
     super(...arguments), this.type = 4;
   }
@@ -437,7 +437,7 @@ class tt extends Y {
     this.element.toggleAttribute(this.name, !!e && e !== h);
   }
 }
-class nt extends Y {
+class it extends J {
   constructor(e, t, n, s, a) {
     super(e, t, n, s, a), this.type = 5;
   }
@@ -450,7 +450,7 @@ class nt extends Y {
     typeof this._$AH == "function" ? this._$AH.call(this.options?.host ?? this.element, e) : this._$AH.handleEvent(e);
   }
 }
-class it {
+class nt {
   constructor(e, t, n) {
     this.element = e, this.type = 6, this._$AN = void 0, this._$AM = t, this.options = n;
   }
@@ -472,7 +472,7 @@ const at = (i, e, t) => {
   }
   return s._$AI(i), s;
 };
-const re = globalThis;
+const oe = globalThis;
 class T extends N {
   constructor() {
     super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
@@ -495,11 +495,11 @@ class T extends N {
     return O;
   }
 }
-T._$litElement$ = !0, T.finalized = !0, re.litElementHydrateSupport?.({ LitElement: T });
-const ot = re.litElementPolyfillSupport;
-ot?.({ LitElement: T });
-(re.litElementVersions ??= []).push("4.2.2");
-const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map(), Se = /* @__PURE__ */ new Map(), lt = {
+T._$litElement$ = !0, T.finalized = !0, oe.litElementHydrateSupport?.({ LitElement: T });
+const rt = oe.litElementPolyfillSupport;
+rt?.({ LitElement: T });
+(oe.litElementVersions ??= []).push("4.2.2");
+const ot = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map(), ke = /* @__PURE__ */ new Map(), lt = {
   de: {
     title: "Amortisation der PV-Anlage",
     benefit: "Bisheriger Ertrag",
@@ -523,7 +523,14 @@ const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     discountRate: "Abzinsungssatz",
     defaultRate: "Standardwert",
     locationFallback: "Der Home-Assistant-Standort fehlt. Die saisonalen Szenarien verwenden deshalb die lineare Prognose.",
-    close: "Schließen"
+    close: "Schließen",
+    relativeYear: "Jahr",
+    relativeYears: "Jahre",
+    relativeMonth: "Monat",
+    relativeMonths: "Monate",
+    relativeIn: "in",
+    relativeThisMonth: "diesen Monat",
+    relativeOverdue: "überfällig"
   },
   en: {
     title: "PV payback",
@@ -548,7 +555,14 @@ const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     discountRate: "Discount rate",
     defaultRate: "default",
     locationFallback: "The Home Assistant location is unavailable. The seasonal scenarios therefore use the linear forecast.",
-    close: "Close"
+    close: "Close",
+    relativeYear: "year",
+    relativeYears: "years",
+    relativeMonth: "month",
+    relativeMonths: "months",
+    relativeIn: "in",
+    relativeThisMonth: "this month",
+    relativeOverdue: "overdue"
   }
 }, dt = {
   de: {
@@ -557,6 +571,12 @@ const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     display_style: "Darstellung",
     display_style_full: "Vollständig",
     display_style_compact: "Kompakt",
+    payback_date_format: "Format des Amortisationsdatums",
+    payback_date_format_absolute: "Absolut (Datum)",
+    payback_date_format_relative: "Relativ (verbleibende Zeit)",
+    payback_date_relative_reference: "Bezugspunkt für die relative Zeit",
+    payback_date_relative_reference_now: "Ab heute",
+    payback_date_relative_reference_start_date: "Ab Startdatum",
     start_date: "Startdatum",
     investment_cost: "Investitionskosten",
     electricity_price: "Strompreis pro kWh",
@@ -583,6 +603,12 @@ const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
     display_style: "Display style",
     display_style_full: "Full",
     display_style_compact: "Compact",
+    payback_date_format: "Payback date format",
+    payback_date_format_absolute: "Absolute (date)",
+    payback_date_format_relative: "Relative (time remaining)",
+    payback_date_relative_reference: "Reference point for relative time",
+    payback_date_relative_reference_now: "From now",
+    payback_date_relative_reference_start_date: "From start date",
     start_date: "Start date",
     investment_cost: "Investment cost",
     electricity_price: "Electricity price per kWh",
@@ -607,7 +633,7 @@ const rt = 365.2425, ct = 366 * 50, we = 180 * 1e3, xe = /* @__PURE__ */ new Map
 function V(i) {
   return i === "Wh" || i === "kWh" || i === "MWh";
 }
-function ne(i, e) {
+function ie(i, e) {
   if (!(!Number.isFinite(i) || !V(e)))
     return e === "Wh" ? i / 1e3 : e === "MWh" ? i * 1e3 : i;
 }
@@ -615,6 +641,8 @@ function ut(i) {
   return {
     ...i,
     display_style: i.display_style ?? "full",
+    payback_date_format: i.payback_date_format ?? "absolute",
+    payback_date_relative_reference: i.payback_date_relative_reference ?? "now",
     show_breakdown: i.show_breakdown ?? !0,
     show_energy_values: i.show_energy_values ?? !0,
     show_money_values: i.show_money_values ?? !0,
@@ -629,7 +657,7 @@ function ut(i) {
 function ce(i) {
   return i.apply_annual_discount ?? i.use_historical_statistics ?? !1;
 }
-function Ae(i, e) {
+function Se(i, e) {
   return !i || i === "PV-Amortisation" ? e : i;
 }
 function ht(i, e, t, n) {
@@ -641,27 +669,27 @@ function x(i) {
   return new Date(i.getFullYear(), i.getMonth(), i.getDate());
 }
 function P(i, e) {
-  const t = new Date(i.getFullYear(), 0, 0), n = Math.round((x(i).getTime() - t.getTime()) / 864e5), s = e * Math.PI / 180, a = 0.409 * Math.sin(2 * Math.PI * n / 365 - 1.39), o = -Math.tan(s) * Math.tan(a), r = Math.acos(Math.max(-1, Math.min(1, o))), c = r * Math.sin(s) * Math.sin(a) + Math.cos(s) * Math.cos(a) * Math.sin(r);
+  const t = new Date(i.getFullYear(), 0, 0), n = Math.round((x(i).getTime() - t.getTime()) / 864e5), s = e * Math.PI / 180, a = 0.409 * Math.sin(2 * Math.PI * n / 365 - 1.39), r = -Math.tan(s) * Math.tan(a), o = Math.acos(Math.max(-1, Math.min(1, r))), c = o * Math.sin(s) * Math.sin(a) + Math.cos(s) * Math.cos(a) * Math.sin(o);
   return Math.max(0, c);
 }
 function pt(i, e, t, n, s) {
   const a = /* @__PURE__ */ new Date(`${i}T00:00:00`);
   if (Number.isNaN(a.getTime()) || !Number.isFinite(e.getTime()) || !Number.isFinite(t) || t <= 0 || !Number.isFinite(n) || n <= 0 || !Number.isFinite(s) || s < -90 || s > 90 || a > e)
     return;
-  const o = x(e);
-  let r = 0;
-  for (let _ = x(a); _ <= o; _.setDate(_.getDate() + 1))
-    r += P(_, s);
-  if (!Number.isFinite(r) || r <= 0) return;
-  const c = t / r, l = Math.max(1e-9, n * Number.EPSILON * 16);
+  const r = x(e);
+  let o = 0;
+  for (let _ = x(a); _ <= r; _.setDate(_.getDate() + 1))
+    o += P(_, s);
+  if (!Number.isFinite(o) || o <= 0) return;
+  const c = t / o, l = Math.max(1e-9, n * Number.EPSILON * 16);
   if (t >= n) {
     let _ = 0;
-    for (let g = x(a); g <= o; g.setDate(g.getDate() + 1))
+    for (let g = x(a); g <= r; g.setDate(g.getDate() + 1))
       if (_ += P(g, s) * c, _ >= n - l) return new Date(g);
     return;
   }
   let u = t;
-  const d = new Date(o), p = 366 * 50;
+  const d = new Date(r), p = 366 * 50;
   for (let _ = 0; _ < p; _ += 1) {
     if (u >= n - l) return new Date(d);
     d.setDate(d.getDate() + 1), u += P(d, s) * c;
@@ -670,7 +698,7 @@ function pt(i, e, t, n, s) {
 function Z(i, e) {
   return typeof i == "number" && Number.isFinite(i) && i >= -90 && i <= 90 && typeof e == "number" && Number.isFinite(e) && e >= -180 && e <= 180;
 }
-function k(i) {
+function A(i) {
   return [
     i.getFullYear(),
     String(i.getMonth() + 1).padStart(2, "0"),
@@ -682,12 +710,12 @@ function Q(i, e, t) {
     0,
     (x(i).getTime() - x(e).getTime()) / 864e5
   );
-  return 1 / (1 + t / 100) ** (n / rt);
+  return 1 / (1 + t / 100) ** (n / ot);
 }
 function _t(i) {
   const e = i.start ?? i.start_time;
   if (typeof e == "number")
-    return !Number.isFinite(e) || Number.isNaN(new Date(e).getTime()) ? void 0 : k(new Date(e));
+    return !Number.isFinite(e) || Number.isNaN(new Date(e).getTime()) ? void 0 : A(new Date(e));
   if (!(typeof e != "string" || Number.isNaN(new Date(e).getTime())))
     return e.slice(0, 10);
 }
@@ -701,24 +729,24 @@ function ee(i) {
       continue;
     }
     if (t !== void 0) {
-      const o = a - t;
-      o >= 0 && e.set(s, o);
+      const r = a - t;
+      r >= 0 && e.set(s, r);
     }
     t = a;
   }
   return e;
 }
-function ke(i, e) {
+function Ae(i, e) {
   const t = ee(e?.[i.export_energy_entity]), n = i.self_consumption_entity ? ee(e?.[i.self_consumption_entity]) : void 0, s = i.production_energy_entity ? ee(e?.[i.production_energy_entity]) : void 0;
   return [.../* @__PURE__ */ new Set([
     ...t.keys(),
     ...n?.keys() ?? [],
     ...s?.keys() ?? []
-  ])].sort().flatMap((o) => {
-    const r = t.get(o);
-    if (r === void 0) return [];
-    const c = n ? n.get(o) : s?.get(o) === void 0 ? void 0 : Math.max(0, s.get(o) - r);
-    return c === void 0 || !Number.isFinite(c) || c < 0 ? [] : [{ date: o, selfConsumption: c, exported: r }];
+  ])].sort().flatMap((r) => {
+    const o = t.get(r);
+    if (o === void 0) return [];
+    const c = n ? n.get(r) : s?.get(r) === void 0 ? void 0 : Math.max(0, s.get(r) - o);
+    return c === void 0 || !Number.isFinite(c) || c < 0 ? [] : [{ date: r, selfConsumption: c, exported: o }];
   });
 }
 function We(i, e) {
@@ -732,14 +760,14 @@ function gt(i, e, t = /* @__PURE__ */ new Date()) {
   if (Number.isNaN(n.getTime()) || Number.isNaN(t.getTime())) return;
   const s = x(n);
   s.setDate(s.getDate() - 1);
-  const a = x(t), o = x(t);
-  o.setDate(o.getDate() - 1);
-  const r = k(o), c = We(e, r), l = xe.get(c);
+  const a = x(t), r = x(t);
+  r.setDate(r.getDate() - 1);
+  const o = A(r), c = We(e, o), l = xe.get(c);
   if (l) return l;
   const u = e.self_consumption_entity ? [e.self_consumption_entity, e.export_energy_entity] : [e.production_energy_entity, e.export_energy_entity], d = i.callWS({
     type: "recorder/statistics_during_period",
-    start_time: `${k(s)}T00:00:00`,
-    end_time: `${k(a)}T00:00:00`,
+    start_time: `${A(s)}T00:00:00`,
+    end_time: `${A(a)}T00:00:00`,
     statistic_ids: u,
     period: "day",
     types: ["sum"]
@@ -751,39 +779,39 @@ function gt(i, e, t = /* @__PURE__ */ new Date()) {
 }
 function mt(i, e, t, n) {
   const s = i.use_location_seasonality && Z(n?.latitude, n?.longitude), a = [];
-  for (let r = x(e); r <= x(t); r.setDate(r.getDate() + 1))
+  for (let o = x(e); o <= x(t); o.setDate(o.getDate() + 1))
     a.push({
-      date: new Date(r),
-      weight: s ? P(r, n.latitude) : 1
+      date: new Date(o),
+      weight: s ? P(o, n.latitude) : 1
     });
-  return a.reduce((r, c) => r + c.weight, 0) > 0 ? a : a.map((r) => ({ ...r, weight: 1 }));
+  return a.reduce((o, c) => o + c.weight, 0) > 0 ? a : a.map((o) => ({ ...o, weight: 1 }));
 }
 function yt(i, e, t, n, s, a) {
-  const o = /* @__PURE__ */ new Date(`${i.start_date}T00:00:00`);
-  if (Number.isNaN(o.getTime()) || o > n) return [];
-  const r = mt(i, o, n, s), c = new Map((a ?? []).map((p) => [p.date, p])), l = (p, _) => {
-    const g = r.map(
-      ({ date: w }) => Math.max(0, c.get(k(w))?.[_] ?? 0)
-    ), $ = g.reduce((w, b) => w + b, 0), v = r.reduce(
-      (w, b, E) => w + (g[E] > 0 ? 0 : b.weight),
+  const r = /* @__PURE__ */ new Date(`${i.start_date}T00:00:00`);
+  if (Number.isNaN(r.getTime()) || r > n) return [];
+  const o = mt(i, r, n, s), c = new Map((a ?? []).map((p) => [p.date, p])), l = (p, _) => {
+    const g = o.map(
+      ({ date: w }) => Math.max(0, c.get(A(w))?.[_] ?? 0)
+    ), $ = g.reduce((w, b) => w + b, 0), v = o.reduce(
+      (w, b, D) => w + (g[D] > 0 ? 0 : b.weight),
       0
-    ), m = r.map((w, b) => $ > 0 && g[b] > 0 ? g[b] : v > 0 ? p * w.weight / v : 0), S = m.reduce((w, b) => w + b, 0);
-    return S > 0 ? m.map((w) => w * p / S) : m;
+    ), m = o.map((w, b) => $ > 0 && g[b] > 0 ? g[b] : v > 0 ? p * w.weight / v : 0), k = m.reduce((w, b) => w + b, 0);
+    return k > 0 ? m.map((w) => w * p / k) : m;
   }, u = l(Math.max(0, e), "selfConsumption"), d = l(Math.max(0, t), "exported");
-  return r.map((p, _) => ({
-    date: k(p.date),
+  return o.map((p, _) => ({
+    date: A(p.date),
     selfConsumption: u[_],
     exported: d[_]
   }));
 }
 function ft(i, e, t, n) {
   const s = /* @__PURE__ */ new Date(`${i.start_date}T00:00:00`), a = i.annual_discount_rate ?? 0;
-  let o = 0, r = 0, c = 0, l;
+  let r = 0, o = 0, c = 0, l;
   for (const $ of t) {
-    const v = /* @__PURE__ */ new Date(`${$.date}T00:00:00`), m = $.selfConsumption * i.electricity_price * Q(v, s, a), S = $.exported * i.feed_in_tariff * Q(v, s, a);
-    o += m, r += S, c += m + S, !l && c >= i.investment_cost && (l = v);
+    const v = /* @__PURE__ */ new Date(`${$.date}T00:00:00`), m = $.selfConsumption * i.electricity_price * Q(v, s, a), k = $.exported * i.feed_in_tariff * Q(v, s, a);
+    r += m, o += k, c += m + k, !l && c >= i.investment_cost && (l = v);
   }
-  if (l) return { ownValue: o, exportValue: r, paybackDate: l };
+  if (l) return { ownValue: r, exportValue: o, paybackDate: l };
   const u = i.use_location_seasonality && Z(n?.latitude, n?.longitude), d = t.reduce(
     ($, v) => $ + (u ? P(/* @__PURE__ */ new Date(`${v.date}T00:00:00`), n.latitude) : 1),
     0
@@ -791,41 +819,41 @@ function ft(i, e, t, n) {
     ($, v) => $ + v.selfConsumption * i.electricity_price + v.exported * i.feed_in_tariff,
     0
   );
-  if (d <= 0 || p <= 0) return { ownValue: o, exportValue: r };
+  if (d <= 0 || p <= 0) return { ownValue: r, exportValue: o };
   const _ = p / d, g = x(e);
   for (let $ = 0; $ < ct; $ += 1) {
     g.setDate(g.getDate() + 1);
     const v = u ? P(g, n.latitude) : 1;
     if (c += _ * v * Q(g, s, a), c >= i.investment_cost)
-      return { ownValue: o, exportValue: r, paybackDate: new Date(g) };
+      return { ownValue: r, exportValue: o, paybackDate: new Date(g) };
   }
-  return { ownValue: o, exportValue: r };
+  return { ownValue: r, exportValue: o };
 }
 function L(i, e, t, n = /* @__PURE__ */ new Date(), s, a) {
-  const o = Math.max(0, t - (i.export_energy_baseline ?? 0)), r = i.self_consumption_entity ? Math.max(0, e - (i.self_consumption_baseline ?? 0)) : Math.max(
+  const r = Math.max(0, t - (i.export_energy_baseline ?? 0)), o = i.self_consumption_entity ? Math.max(0, e - (i.self_consumption_baseline ?? 0)) : Math.max(
     0,
-    e - (i.production_energy_baseline ?? 0) - o
-  ), c = r * i.electricity_price, l = o * i.feed_in_tariff;
+    e - (i.production_energy_baseline ?? 0) - r
+  ), c = o * i.electricity_price, l = r * i.feed_in_tariff;
   if (ce(i) && (i.annual_discount_rate ?? 0) > 0) {
     const w = yt(
       i,
-      r,
       o,
+      r,
       n,
       s,
       a
-    ), b = ft(i, n, w, s), E = b.ownValue + b.exportValue;
+    ), b = ft(i, n, w, s), D = b.ownValue + b.exportValue;
     return {
-      selfConsumption: r,
-      exported: o,
+      selfConsumption: o,
+      exported: r,
       ownValue: b.ownValue,
       exportValue: b.exportValue,
-      benefit: E,
-      progress: Math.min(100, E / i.investment_cost * 100),
+      benefit: D,
+      progress: Math.min(100, D / i.investment_cost * 100),
       paybackDate: b.paybackDate
     };
   }
-  const u = c, d = l, p = u + d, _ = Math.min(100, p / i.investment_cost * 100), g = /* @__PURE__ */ new Date(`${i.start_date}T00:00:00`), $ = ht(g, n, p, i.investment_cost), v = s?.latitude, m = s?.longitude, S = i.use_location_seasonality && Z(v, m) ? pt(
+  const u = c, d = l, p = u + d, _ = Math.min(100, p / i.investment_cost * 100), g = /* @__PURE__ */ new Date(`${i.start_date}T00:00:00`), $ = ht(g, n, p, i.investment_cost), v = s?.latitude, m = s?.longitude, k = i.use_location_seasonality && Z(v, m) ? pt(
     i.start_date,
     n,
     p,
@@ -833,24 +861,24 @@ function L(i, e, t, n = /* @__PURE__ */ new Date(), s, a) {
     v
   ) ?? $ : $;
   return {
-    selfConsumption: r,
-    exported: o,
+    selfConsumption: o,
+    exported: r,
     ownValue: u,
     exportValue: d,
     benefit: p,
     progress: _,
-    paybackDate: S
+    paybackDate: k
   };
 }
-function vt(i, e, t, n = /* @__PURE__ */ new Date(), s, a, o = i.annual_discount_rate ?? 3) {
-  const r = {
+function vt(i, e, t, n = /* @__PURE__ */ new Date(), s, a, r = i.annual_discount_rate ?? 3) {
+  const o = {
     ...i,
     apply_annual_discount: !1,
     use_historical_statistics: !1
   };
   return {
     linear: L(
-      { ...r, use_location_seasonality: !1, annual_discount_rate: 0 },
+      { ...o, use_location_seasonality: !1, annual_discount_rate: 0 },
       e,
       t,
       n,
@@ -858,7 +886,7 @@ function vt(i, e, t, n = /* @__PURE__ */ new Date(), s, a, o = i.annual_discount
       a
     ),
     seasonal: L(
-      { ...r, use_location_seasonality: !0, annual_discount_rate: 0 },
+      { ...o, use_location_seasonality: !0, annual_discount_rate: 0 },
       e,
       t,
       n,
@@ -867,9 +895,9 @@ function vt(i, e, t, n = /* @__PURE__ */ new Date(), s, a, o = i.annual_discount
     ),
     discounted: L(
       {
-        ...r,
+        ...o,
         use_location_seasonality: !0,
-        annual_discount_rate: o,
+        annual_discount_rate: r,
         apply_annual_discount: !0
       },
       e,
@@ -898,20 +926,20 @@ function bt(i, e) {
       const n = i[t], s = n.s ?? n.state;
       if (typeof s == "string" && s.trim() === "" || s === null || s === void 0)
         continue;
-      const a = typeof s == "number" ? s : Number(s), o = ne(a, e);
-      if (o === void 0 || o < 0) continue;
-      const r = typeof n.last_updated == "string" ? n.last_updated : typeof n.lu == "number" && Number.isFinite(n.lu) ? new Date(n.lu * 1e3).toISOString() : void 0;
-      return { value: o, timestamp: r };
+      const a = typeof s == "number" ? s : Number(s), r = ie(a, e);
+      if (r === void 0 || r < 0) continue;
+      const o = typeof n.last_updated == "string" ? n.last_updated : typeof n.lu == "number" && Number.isFinite(n.lu) ? new Date(n.lu * 1e3).toISOString() : void 0;
+      return { value: r, timestamp: o };
     }
 }
 function $t(i, e, t = /* @__PURE__ */ new Date()) {
   const n = Object.keys(e).sort();
   if (!i.callWS || n.length === 0 || Number.isNaN(t.getTime())) return;
-  const s = Math.floor(t.getTime() / (300 * 1e3)), a = JSON.stringify([n, s]), o = Se.get(a);
-  if (o) return o;
-  const r = new Date(t.getTime() - 1440 * 60 * 1e3), c = i.callWS({
+  const s = Math.floor(t.getTime() / (300 * 1e3)), a = JSON.stringify([n, s]), r = ke.get(a);
+  if (r) return r;
+  const o = new Date(t.getTime() - 1440 * 60 * 1e3), c = i.callWS({
     type: "history/history_during_period",
-    start_time: r.toISOString(),
+    start_time: o.toISOString(),
     end_time: t.toISOString(),
     entity_ids: n,
     include_start_time_state: !0,
@@ -928,7 +956,7 @@ function $t(i, e, t = /* @__PURE__ */ new Date()) {
       })
     );
   }).catch(() => ({}));
-  return Se.set(a, c), c;
+  return ke.set(a, c), c;
 }
 function wt(i) {
   if (i)
@@ -942,7 +970,7 @@ function wt(i) {
       return;
     }
 }
-function Ee(i, e) {
+function De(i, e) {
   try {
     return wt(i.getItem(e));
   } catch {
@@ -952,9 +980,13 @@ function Ee(i, e) {
 function xt(i, e) {
   return i !== void 0 && i >= 0 ? e && i < e.value ? { value: e.value, cached: !0, regression: !0 } : { value: i, cached: !1, regression: !1 } : e ? { value: e.value, cached: !0, regression: !1 } : { cached: !1, regression: !1 };
 }
-function St(i) {
+function kt(i) {
   if (i.display_style !== void 0 && !["full", "compact"].includes(i.display_style))
     return "display_style";
+  if (i.payback_date_format !== void 0 && !["absolute", "relative"].includes(i.payback_date_format))
+    return "payback_date_format";
+  if (i.payback_date_relative_reference !== void 0 && !["now", "start_date"].includes(i.payback_date_relative_reference))
+    return "payback_date_relative_reference";
   if (!i.start_date || Number.isNaN((/* @__PURE__ */ new Date(`${i.start_date}T00:00:00`)).getTime()))
     return "start_date";
   for (const e of ["investment_cost", "electricity_price", "feed_in_tariff"])
@@ -973,7 +1005,7 @@ function St(i) {
   if (!i.export_energy_entity || !i.self_consumption_entity && !i.production_energy_entity)
     return "energy entity";
 }
-class At extends T {
+class St extends T {
   static properties = {
     hass: { attribute: !1 },
     _config: { state: !0 },
@@ -983,7 +1015,7 @@ class At extends T {
     super(), this._config = {}, this._advancedOpen = !1;
   }
   setConfig(e) {
-    this._config = { ...e }, (e.self_consumption_entity || e.self_consumption_baseline !== void 0 || e.use_location_seasonality === !0 || e.apply_annual_discount === !0 || e.use_historical_statistics === !0 || (e.annual_discount_rate ?? 0) !== 0 || e.show_breakdown === !1 || e.show_energy_values === !1 || e.show_money_values === !1 || e.show_payback_date === !1 || e.show_progress === !1) && (this._advancedOpen = !0);
+    this._config = { ...e }, (e.self_consumption_entity || e.self_consumption_baseline !== void 0 || e.use_location_seasonality === !0 || e.apply_annual_discount === !0 || e.use_historical_statistics === !0 || (e.annual_discount_rate ?? 0) !== 0 || e.show_breakdown === !1 || e.show_energy_values === !1 || e.show_money_values === !1 || e.show_payback_date === !1 || e.show_progress === !1 || e.payback_date_format === "relative" || e.payback_date_relative_reference === "start_date") && (this._advancedOpen = !0);
   }
   toggleAdvanced() {
     this._advancedOpen = !this._advancedOpen;
@@ -1041,20 +1073,20 @@ class At extends T {
     ], s = [
       ["self_consumption_baseline", e.self_consumption_baseline, "number"],
       ["annual_discount_rate", e.annual_discount_rate, "number"]
-    ], a = ([r, c, l]) => f`<label
+    ], a = ([o, c, l]) => f`<label
         >${c}<input
-          name=${r}
+          name=${o}
           type=${l}
           step="any"
-          .value=${String(this._config[r] ?? "")}
+          .value=${String(this._config[o] ?? "")}
           @change=${this.changed}
-      /></label>`, o = (r) => f`<label
+      /></label>`, r = (o) => f`<label
         ><input
-          name=${r}
+          name=${o}
           type="checkbox"
-          .checked=${r === "show_contribution_segments" || r === "use_location_seasonality" || r === "apply_annual_discount" ? this._config[r] === !0 : this._config[r] !== !1}
+          .checked=${o === "show_contribution_segments" || o === "use_location_seasonality" || o === "apply_annual_discount" ? this._config[o] === !0 : this._config[o] !== !1}
           @change=${this.changed}
-        />${e[r]}</label
+        />${e[o]}</label
       >`;
     return f`${t.map(
       a
@@ -1069,7 +1101,7 @@ class At extends T {
           <option value="full">${e.display_style_full}</option>
           <option value="compact">${e.display_style_compact}</option>
         </select></label
-      >${o("show_contribution_segments")}
+      >${r("show_contribution_segments")}
       <button
         class="advanced-toggle"
         type="button"
@@ -1082,13 +1114,36 @@ class At extends T {
       ${this._advancedOpen ? f`<section class="advanced-settings">
               <p>${e.advanced_settings_description}</p>
               ${this.entityField("self_consumption_entity", e.self_consumption_entity)}
-              ${s.map(a)} ${o("show_breakdown")}
-              ${o("show_energy_values")} ${o("show_money_values")}
-              ${o("show_payback_date")} ${o("show_progress")}
-              ${o("use_location_seasonality")} ${o("apply_annual_discount")}
+              ${s.map(a)} ${r("show_breakdown")}
+              ${r("show_energy_values")} ${r("show_money_values")}
+              ${r("show_payback_date")}
+              <label
+                >${e.payback_date_format}<select
+                  name="payback_date_format"
+                  .value=${this._config.payback_date_format ?? "absolute"}
+                  @change=${this.changed}
+                >
+                  <option value="absolute">${e.payback_date_format_absolute}</option>
+                  <option value="relative">${e.payback_date_format_relative}</option>
+                </select></label
+              >
+              <label
+                >${e.payback_date_relative_reference}<select
+                  name="payback_date_relative_reference"
+                  .value=${this._config.payback_date_relative_reference ?? "now"}
+                  @change=${this.changed}
+                >
+                  <option value="now">${e.payback_date_relative_reference_now}</option>
+                  <option value="start_date">
+                    ${e.payback_date_relative_reference_start_date}
+                  </option>
+                </select></label
+              >
+              ${r("show_progress")} ${r("use_location_seasonality")}
+              ${r("apply_annual_discount")}
             </section>` : h}`;
   }
-  static styles = Ce`
+  static styles = Me`
     label {
       display: block;
       margin: 10px 0;
@@ -1148,8 +1203,8 @@ class At extends T {
     }
   `;
 }
-customElements.define("pv-payback-card-editor", At);
-class kt extends T {
+customElements.define("pv-payback-card-editor", St);
+class At extends T {
   static properties = {
     hass: { attribute: !1 },
     _config: { state: !0 },
@@ -1163,6 +1218,8 @@ class kt extends T {
     return {
       type: "custom:pv-payback-card",
       display_style: "full",
+      payback_date_format: "absolute",
+      payback_date_relative_reference: "now",
       show_breakdown: !0,
       show_energy_values: !0,
       show_money_values: !0,
@@ -1197,20 +1254,20 @@ class kt extends T {
   }
   persistentWarningReadings(e) {
     const t = Date.now(), n = e.filter(
-      (r) => r.issueKey !== void 0
-    ), s = new Set(n.map((r) => r.issueKey));
-    for (const r of this._warningStartedAt.keys())
-      s.has(r) || this._warningStartedAt.delete(r);
-    for (const r of n)
-      this._warningStartedAt.has(r.issueKey) || this._warningStartedAt.set(r.issueKey, t);
+      (o) => o.issueKey !== void 0
+    ), s = new Set(n.map((o) => o.issueKey));
+    for (const o of this._warningStartedAt.keys())
+      s.has(o) || this._warningStartedAt.delete(o);
+    for (const o of n)
+      this._warningStartedAt.has(o.issueKey) || this._warningStartedAt.set(o.issueKey, t);
     const a = n.filter(
-      (r) => t - this._warningStartedAt.get(r.issueKey) >= we
-    ), o = n.map((r) => we - (t - this._warningStartedAt.get(r.issueKey))).filter((r) => r > 0);
-    return this._warningTimer !== void 0 && clearTimeout(this._warningTimer), this._warningTimer = void 0, o.length > 0 && (this._warningTimer = setTimeout(
+      (o) => t - this._warningStartedAt.get(o.issueKey) >= we
+    ), r = n.map((o) => we - (t - this._warningStartedAt.get(o.issueKey))).filter((o) => o > 0);
+    return this._warningTimer !== void 0 && clearTimeout(this._warningTimer), this._warningTimer = void 0, r.length > 0 && (this._warningTimer = setTimeout(
       () => {
         this._warningTimer = void 0, this.requestUpdate();
       },
-      Math.min(...o)
+      Math.min(...r)
     )), a;
   }
   updated() {
@@ -1219,7 +1276,7 @@ class kt extends T {
       if (ce(e) && (e.annual_discount_rate ?? 0) > 0) {
         const t = x(/* @__PURE__ */ new Date());
         t.setDate(t.getDate() - 1);
-        const n = We(e, k(t));
+        const n = We(e, A(t));
         this._historicalStatisticsKey !== n && (this._historicalStatisticsKey = n, gt(this.hass, e)?.then((s) => {
           s && this._historicalStatisticsKey === n && (this._historicalStatistics = s, this.requestUpdate());
         }));
@@ -1233,19 +1290,19 @@ class kt extends T {
       (a) => !!a
     ), n = {};
     for (const a of t) {
-      const o = this.hass.states[a], r = o?.attributes?.unit_of_measurement;
-      if (!V(r)) continue;
-      const c = Number(o.state), l = ne(c, r), u = Ee(localStorage, F(e, a));
-      l === void 0 && u === void 0 && (n[a] = r);
+      const r = this.hass.states[a], o = r?.attributes?.unit_of_measurement;
+      if (!V(o)) continue;
+      const c = Number(r.state), l = ie(c, o), u = De(localStorage, F(e, a));
+      l === void 0 && u === void 0 && (n[a] = o);
     }
     const s = JSON.stringify(
       Object.keys(n).sort().map((a) => F(e, a))
     );
     Object.keys(n).length === 0 || this._historyRecoveryKey === s || (this._historyRecoveryKey = s, $t(this.hass, n)?.then((a) => {
       if (this._historyRecoveryKey === s) {
-        for (const [o, r] of Object.entries(a))
+        for (const [r, o] of Object.entries(a))
           try {
-            localStorage.setItem(F(e, o), JSON.stringify(r));
+            localStorage.setItem(F(e, r), JSON.stringify(o));
           } catch {
           }
         Object.keys(a).length > 0 && this.requestUpdate();
@@ -1256,7 +1313,7 @@ class kt extends T {
     return 4;
   }
   readEnergy(e, t, n) {
-    const s = this.hass?.states[t], a = s ? Number(s.state) : Number.NaN, o = ne(a, s?.attributes?.unit_of_measurement), r = Ee(localStorage, F(e, t)), c = xt(o, r), l = s?.attributes?.unit_of_measurement, u = s && !V(l) ? n.unsupportedUnit : n.entityUnavailable;
+    const s = this.hass?.states[t], a = s ? Number(s.state) : Number.NaN, r = ie(a, s?.attributes?.unit_of_measurement), o = De(localStorage, F(e, t)), c = xt(r, o), l = s?.attributes?.unit_of_measurement, u = s && !V(l) ? n.unsupportedUnit : n.entityUnavailable;
     if (c.value !== void 0) {
       if (!c.cached) {
         const d = JSON.stringify({
@@ -1271,7 +1328,7 @@ class kt extends T {
       return {
         value: c.value,
         cached: c.cached,
-        timestamp: c.cached ? r?.timestamp : s?.last_updated,
+        timestamp: c.cached ? o?.timestamp : s?.last_updated,
         warning: c.regression ? `${t}: ${n.counterRegression}` : c.cached ? `${t}: ${u}` : void 0,
         issueKey: c.cached ? `${t}:${c.regression ? "regression" : "unavailable"}` : void 0
       };
@@ -1302,6 +1359,23 @@ class kt extends T {
       dateStyle: "medium"
     }).format(e) : "—";
   }
+  formatRelativeDate(e, t) {
+    if (!e) return "—";
+    const n = this.text(), s = x(t), a = x(e);
+    if (a.getTime() <= s.getTime()) return n.relativeOverdue;
+    const r = (a.getFullYear() - s.getFullYear()) * 12 + (a.getMonth() - s.getMonth()) - (a.getDate() < s.getDate() ? 1 : 0), o = Math.floor(r / 12), c = r % 12, l = [];
+    return o > 0 && l.push(`${o} ${o === 1 ? n.relativeYear : n.relativeYears}`), c > 0 && l.push(`${c} ${c === 1 ? n.relativeMonth : n.relativeMonths}`), l.length === 0 ? n.relativeThisMonth : `${n.relativeIn} ${l.join(", ")}`;
+  }
+  relativeReferenceDate(e) {
+    if (this._config?.payback_date_relative_reference === "start_date") {
+      const t = /* @__PURE__ */ new Date(`${this._config.start_date}T00:00:00`);
+      if (!Number.isNaN(t.getTime())) return t;
+    }
+    return e;
+  }
+  formatPaybackDate(e, t) {
+    return this._config?.payback_date_format === "relative" ? this.formatRelativeDate(e, this.relativeReferenceDate(t)) : this.formatDate(e);
+  }
   formatPercentage(e) {
     return new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
       style: "percent",
@@ -1317,63 +1391,63 @@ class kt extends T {
   handleScenarioKeydown(e) {
     e.key !== "Enter" && e.key !== " " || (e.preventDefault(), this.openScenarioDialog());
   }
-  renderScenarioDialog(e, t) {
-    const n = this.text(), s = [
+  renderScenarioDialog(e, t, n) {
+    const s = this.text(), a = [
       {
-        name: n.scenarioLinear,
+        name: s.scenarioLinear,
         scenario: e.linear,
         icon: "mdi:chart-line",
         className: "scenario-linear"
       },
       {
-        name: n.scenarioSeasonal,
+        name: s.scenarioSeasonal,
         scenario: e.seasonal,
         icon: "mdi:weather-sunny",
         className: "scenario-seasonal"
       },
       {
-        name: n.scenarioDiscounted,
+        name: s.scenarioDiscounted,
         scenario: e.discounted,
         icon: "mdi:percent-circle-outline",
         className: "scenario-discounted"
       }
-    ], a = [
-      t ? void 0 : n.locationFallback,
-      s.some(({ scenario: o }) => !o.paybackDate) ? n.noProjection : void 0
+    ], r = [
+      t ? void 0 : s.locationFallback,
+      a.some(({ scenario: o }) => !o.paybackDate) ? s.noProjection : void 0
     ].filter((o) => o !== void 0);
     return f`<ha-dialog
       .open=${this._scenarioDialogOpen}
-      .heading=${n.scenariosTitle}
+      .heading=${s.scenariosTitle}
       @closed=${this.closeScenarioDialog}
     >
       <div class="scenario-dialog">
-        ${a.length > 0 ? f`<div class="scenario-warning">
-                ${this.renderWarningIndicator(a.join(`
+        ${r.length > 0 ? f`<div class="scenario-warning">
+                ${this.renderWarningIndicator(r.join(`
 `))}
               </div>` : h}
-        ${s.map(
-      ({ name: o, scenario: r, icon: c, className: l }, u) => f`<section class=${`scenario ${l}`}>
+        ${a.map(
+      ({ name: o, scenario: c, icon: l, className: u }, d) => f`<section class=${`scenario ${u}`}>
               <div class="scenario-heading">
-                <ha-icon .icon=${c}></ha-icon>
+                <ha-icon .icon=${l}></ha-icon>
                 <h3>${o}</h3>
               </div>
-              ${u === 2 ? f`<div class="scenario-rate">
-                      ${n.discountRate}: ${this.formatPercentage(this._comparisonDiscountRate)}
-                      ${this._comparisonUsesDefaultRate ? f`(${n.defaultRate})` : h}
+              ${d === 2 ? f`<div class="scenario-rate">
+                      ${s.discountRate}: ${this.formatPercentage(this._comparisonDiscountRate)}
+                      ${this._comparisonUsesDefaultRate ? f`(${s.defaultRate})` : h}
                     </div>` : h}
               <div class="scenario-values">
                 <div>
-                  <span>${n.benefit}</span><strong>${this.formatMoney(r.benefit)}</strong>
+                  <span>${s.benefit}</span><strong>${this.formatMoney(c.benefit)}</strong>
                 </div>
                 <div>
-                  <span>${n.expected}</span
-                  ><strong>${this.formatDate(r.paybackDate)}</strong>
+                  <span>${s.expected}</span
+                  ><strong>${this.formatPaybackDate(c.paybackDate, n)}</strong>
                 </div>
               </div>
             </section>`
     )}
       </div>
-      <ha-button slot="primaryAction" @click=${this.closeScenarioDialog}>${n.close}</ha-button>
+      <ha-button slot="primaryAction" @click=${this.closeScenarioDialog}>${s.close}</ha-button>
     </ha-dialog>`;
   }
   renderWarningIndicator(e) {
@@ -1411,7 +1485,7 @@ class kt extends T {
           <div class="header">
             <div class="header-title">
               <ha-icon .icon=${t.icon ?? "mdi:solar-power-variant"}></ha-icon
-              ><span>${Ae(t.name, n.title)}</span>
+              ><span>${Se(t.name, n.title)}</span>
             </div>
             <div class="header-meta">
               ${e ? this.renderWarningIndicator(e) : h}
@@ -1436,7 +1510,7 @@ class kt extends T {
   render() {
     const e = this._config;
     if (!e) return h;
-    const t = this.text(), n = St(e);
+    const t = this.text(), n = kt(e);
     if (n) {
       const y = this.persistentWarningReadings([
         {
@@ -1447,11 +1521,11 @@ class kt extends T {
       ]);
       return this.renderStatusCard(y[0]?.warning);
     }
-    const s = e.self_consumption_entity ? this.readEnergy(e, e.self_consumption_entity, t) : void 0, a = !s && e.production_energy_entity ? this.readEnergy(e, e.production_energy_entity, t) : void 0, o = this.readEnergy(e, e.export_energy_entity, t), r = [s, a, o].filter(
+    const s = e.self_consumption_entity ? this.readEnergy(e, e.self_consumption_entity, t) : void 0, a = !s && e.production_energy_entity ? this.readEnergy(e, e.production_energy_entity, t) : void 0, r = this.readEnergy(e, e.export_energy_entity, t), o = [s, a, r].filter(
       (y) => !!y
     );
-    let c = this.persistentWarningReadings(r);
-    const l = s?.value, u = a?.value, d = o.value;
+    let c = this.persistentWarningReadings(o);
+    const l = s?.value, u = a?.value, d = r.value;
     if (d === void 0 || s !== void 0 && l === void 0 || a !== void 0 && u === void 0) {
       const y = c.length > 0 ? `${t.unavailable}${c.filter((G) => G.warning).map((G) => ` ${G.warning}`).join("")}` : void 0;
       return this.renderStatusCard(y);
@@ -1463,7 +1537,7 @@ class kt extends T {
       e,
       p,
       d,
-      k(_),
+      A(_),
       g,
       $
     ]);
@@ -1475,17 +1549,17 @@ class kt extends T {
         d,
         _,
         g,
-        ke(e, this._historicalStatistics)
+        Ae(e, this._historicalStatistics)
       )
     });
-    const m = this._calculationCache.calculation, S = e.show_payback_date && !m.paybackDate ? {
+    const m = this._calculationCache.calculation, k = e.show_payback_date && !m.paybackDate ? {
       cached: !1,
       issueKey: "projection:no-positive-benefit",
       warning: t.noProjection
     } : void 0;
     c = this.persistentWarningReadings([
-      ...r,
-      ...S ? [S] : []
+      ...o,
+      ...k ? [k] : []
     ]);
     let w;
     if (this._scenarioDialogOpen) {
@@ -1498,17 +1572,17 @@ class kt extends T {
           d,
           _,
           g,
-          ke(e, this._historicalStatistics),
+          Ae(e, this._historicalStatistics),
           this._comparisonDiscountRate
         )
       }), w = this._scenarioCalculationCache.scenarios;
     }
     const b = c.filter(
       (y) => y.issueKey !== "projection:no-positive-benefit"
-    ), E = b.map((y) => y.timestamp).filter(Boolean).sort().at(0), Re = b.length > 0 ? `${t.cached}${E ? `: ${new Intl.DateTimeFormat(e.locale ?? this.hass?.locale?.language, {
+    ), D = b.map((y) => y.timestamp).filter(Boolean).sort().at(0), Re = b.length > 0 ? `${t.cached}${D ? `: ${new Intl.DateTimeFormat(e.locale ?? this.hass?.locale?.language, {
       dateStyle: "short",
       timeStyle: "short"
-    }).format(new Date(E))}` : ""}${b.filter((y) => y.warning).map((y) => ` ${y.warning}`).join("")}` : void 0, Ue = c.some(
+    }).format(new Date(D))}` : ""}${b.filter((y) => y.warning).map((y) => ` ${y.warning}`).join("")}` : void 0, Ue = c.some(
       (y) => y.issueKey === "projection:no-positive-benefit"
     ) ? t.noProjection : void 0, le = [Re, Ue].filter((y) => !!y).join(`
 `), de = Math.min(
@@ -1523,7 +1597,7 @@ class kt extends T {
           <div class="header">
             <div class="header-title">
               <ha-icon .icon=${e.icon ?? "mdi:solar-power-variant"}></ha-icon
-              ><span>${Ae(e.name, t.title)}</span>
+              ><span>${Se(e.name, t.title)}</span>
             </div>
             <div class="header-meta">
               ${le ? this.renderWarningIndicator(le) : h}
@@ -1600,18 +1674,19 @@ class kt extends T {
                     aria-label=${`${t.scenariosOpen}: ${t.expected}`}
                     @click=${this.openScenarioDialog}
                     @keydown=${this.handleScenarioKeydown}
-                    >${this.formatDate(m.paybackDate)}</b
+                    >${this.formatPaybackDate(m.paybackDate, _)}</b
                   >
                 </div>` : h}
         </div>
       </ha-card>
       ${this._scenarioDialogOpen && w ? this.renderScenarioDialog(
       w,
-      Z(g.latitude, g.longitude)
+      Z(g.latitude, g.longitude),
+      _
     ) : h}
       ${this.renderWarningDialog()}`;
   }
-  static styles = Ce`
+  static styles = Me`
     :host {
       display: block;
     }
@@ -1919,7 +1994,7 @@ class kt extends T {
     }
   `;
 }
-customElements.define("pv-payback-card", kt);
+customElements.define("pv-payback-card", At);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "pv-payback-card",
@@ -1927,24 +2002,24 @@ window.customCards.push({
   description: "Displays PV financial payback from cumulative energy sensors."
 });
 export {
-  kt as PVPaybackCard,
-  At as PVPaybackCardEditor,
+  At as PVPaybackCard,
+  St as PVPaybackCardEditor,
   ce as appliesAnnualDiscount,
   F as cacheKey,
   L as calculatePayback,
   vt as calculateScenarioComparisons,
   pt as calculateSeasonalPaybackDate,
   xt as chooseEnergyValue,
-  ke as dailyEnergyFromStatistics,
-  Ae as displayName,
+  Ae as dailyEnergyFromStatistics,
+  Se as displayName,
   yt as distributeHistoricalEnergy,
-  ne as energyToKwh,
+  ie as energyToKwh,
   We as historicalStatisticsCacheKey,
   bt as latestValidEnergyFromHistory,
   gt as loadHistoricalStatistics,
   $t as loadLastValidEnergyHistory,
   wt as parseCachedEnergy,
-  Ee as readCachedEnergy,
+  De as readCachedEnergy,
   ee as statisticDailyDeltas,
   ut as withDisplayDefaults
 };

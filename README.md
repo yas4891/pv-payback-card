@@ -30,6 +30,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 - Optional energy and monetary values in the detailed breakdown.
 - Optional blue and green contribution segments with clickable source-entity details.
 - Clickable benefit and payback values with a localized comparison of linear, seasonal, and discounted scenarios.
+- Optional relative payback date display (e.g. "in 2 years, 3 months") counted from today or from the start date.
 - Cached last valid readings and visible warnings for unavailable or decreasing counters.
 - Localized German and English output.
 - Responsive layout for desktop and mobile dashboards.
@@ -136,6 +137,8 @@ These options provide a direct self-consumption input, detailed visibility contr
 | `show_energy_values`        | No       | `true`  | Shows cumulative self-consumption and export energy in `kWh`. The card rounds displayed energy values to whole `kWh`. Set `false` to hide energy values.                                                                                                                  |
 | `show_money_values`         | No       | `true`  | Shows the calculated monetary value for self-consumption and export. Set `false` to hide these monetary values from the breakdown.                                                                                                                                        |
 | `show_payback_date`         | No       | `true`  | Shows the estimated payback date. Set `false` when only the progress is needed.                                                                                                                                                                                           |
+| `payback_date_format`       | No       | `absolute` | Selects how the estimated payback date is displayed. Use `absolute` for a calendar date or `relative` for the remaining time (e.g. "in 2 years, 3 months"). Example: `relative`.                                                                                      |
+| `payback_date_relative_reference` | No | `now`   | Reference point for `relative` payback dates. Use `now` to count from today or `start_date` to count from the accounting start date. Only relevant when `payback_date_format` is `relative`. Example: `start_date`.                                                    |
 | `show_progress`             | No       | `true`  | Shows the percentage and progress bar. Set `false` when the financial value is sufficient.                                                                                                                                                                                |
 | `use_location_seasonality`  | No       | `false` | Uses a local seasonal solar-potential forecast after valid Home Assistant coordinates confirm the location. The latitude determines the seasonal curve. The card uses the existing linear forecast when the location is missing or invalid.                               |
 | `annual_discount_rate`      | No       | `0`     | Annual discount rate as a percentage. Example: `3.5` means 3.5% per year. The main card only uses this value when `apply_annual_discount` is `true`.                                                                                                                      |

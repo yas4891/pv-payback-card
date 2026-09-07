@@ -12,6 +12,8 @@ type HomeAssistant = {
 export type PVPaybackCardConfig = {
   type: string;
   display_style?: "full" | "compact";
+  payback_date_format?: "absolute" | "relative";
+  payback_date_relative_reference?: "now" | "start_date";
   start_date: string;
   investment_cost: number;
   electricity_price: number;
@@ -108,6 +110,13 @@ const translations = {
     locationFallback:
       "Der Home-Assistant-Standort fehlt. Die saisonalen Szenarien verwenden deshalb die lineare Prognose.",
     close: "Schließen",
+    relativeYear: "Jahr",
+    relativeYears: "Jahre",
+    relativeMonth: "Monat",
+    relativeMonths: "Monate",
+    relativeIn: "in",
+    relativeThisMonth: "diesen Monat",
+    relativeOverdue: "überfällig",
   },
   en: {
     title: "PV payback",
@@ -135,6 +144,13 @@ const translations = {
     locationFallback:
       "The Home Assistant location is unavailable. The seasonal scenarios therefore use the linear forecast.",
     close: "Close",
+    relativeYear: "year",
+    relativeYears: "years",
+    relativeMonth: "month",
+    relativeMonths: "months",
+    relativeIn: "in",
+    relativeThisMonth: "this month",
+    relativeOverdue: "overdue",
   },
 } as const;
 
@@ -146,6 +162,12 @@ const editorTranslations = {
     display_style: "Darstellung",
     display_style_full: "Vollständig",
     display_style_compact: "Kompakt",
+    payback_date_format: "Format des Amortisationsdatums",
+    payback_date_format_absolute: "Absolut (Datum)",
+    payback_date_format_relative: "Relativ (verbleibende Zeit)",
+    payback_date_relative_reference: "Bezugspunkt für die relative Zeit",
+    payback_date_relative_reference_now: "Ab heute",
+    payback_date_relative_reference_start_date: "Ab Startdatum",
     start_date: "Startdatum",
     investment_cost: "Investitionskosten",
     electricity_price: "Strompreis pro kWh",
@@ -173,6 +195,12 @@ const editorTranslations = {
     display_style: "Display style",
     display_style_full: "Full",
     display_style_compact: "Compact",
+    payback_date_format: "Payback date format",
+    payback_date_format_absolute: "Absolute (date)",
+    payback_date_format_relative: "Relative (time remaining)",
+    payback_date_relative_reference: "Reference point for relative time",
+    payback_date_relative_reference_now: "From now",
+    payback_date_relative_reference_start_date: "From start date",
     start_date: "Start date",
     investment_cost: "Investment cost",
     electricity_price: "Electricity price per kWh",
@@ -208,6 +236,8 @@ export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardC
   return {
     ...config,
     display_style: config.display_style ?? "full",
+    payback_date_format: config.payback_date_format ?? "absolute",
+    payback_date_relative_reference: config.payback_date_relative_reference ?? "now",
     show_breakdown: config.show_breakdown ?? true,
     show_energy_values: config.show_energy_values ?? true,
     show_money_values: config.show_money_values ?? true,
@@ -789,6 +819,16 @@ export function chooseEnergyValue(
 function validConfig(config: PVPaybackCardConfig): string | undefined {
   if (config.display_style !== undefined && !["full", "compact"].includes(config.display_style))
     return "display_style";
+  if (
+    config.payback_date_format !== undefined &&
+    !["absolute", "relative"].includes(config.payback_date_format)
+  )
+    return "payback_date_format";
+  if (
+    config.payback_date_relative_reference !== undefined &&
+    !["now", "start_date"].includes(config.payback_date_relative_reference)
+  )
+    return "payback_date_relative_reference";
   if (!config.start_date || Number.isNaN(new Date(`${config.start_date}T00:00:00`).getTime()))
     return "start_date";
   for (const key of ["investment_cost", "electricity_price", "feed_in_tariff"] as const) {
@@ -842,7 +882,9 @@ export class PVPaybackCardEditor extends LitElement {
       config.show_energy_values === false ||
       config.show_money_values === false ||
       config.show_payback_date === false ||
-      config.show_progress === false
+      config.show_progress === false ||
+      config.payback_date_format === "relative" ||
+      config.payback_date_relative_reference === "start_date"
     ) {
       this._advancedOpen = true;
     }
@@ -1000,8 +1042,31 @@ export class PVPaybackCardEditor extends LitElement {
               ${this.entityField("self_consumption_entity", text.self_consumption_entity)}
               ${advancedFields.map(textField)} ${checkboxField("show_breakdown")}
               ${checkboxField("show_energy_values")} ${checkboxField("show_money_values")}
-              ${checkboxField("show_payback_date")} ${checkboxField("show_progress")}
-              ${checkboxField("use_location_seasonality")} ${checkboxField("apply_annual_discount")}
+              ${checkboxField("show_payback_date")}
+              <label
+                >${text.payback_date_format}<select
+                  name="payback_date_format"
+                  .value=${this._config.payback_date_format ?? "absolute"}
+                  @change=${this.changed}
+                >
+                  <option value="absolute">${text.payback_date_format_absolute}</option>
+                  <option value="relative">${text.payback_date_format_relative}</option>
+                </select></label
+              >
+              <label
+                >${text.payback_date_relative_reference}<select
+                  name="payback_date_relative_reference"
+                  .value=${this._config.payback_date_relative_reference ?? "now"}
+                  @change=${this.changed}
+                >
+                  <option value="now">${text.payback_date_relative_reference_now}</option>
+                  <option value="start_date">
+                    ${text.payback_date_relative_reference_start_date}
+                  </option>
+                </select></label
+              >
+              ${checkboxField("show_progress")} ${checkboxField("use_location_seasonality")}
+              ${checkboxField("apply_annual_discount")}
             </section>`
           : nothing
       }`;
@@ -1090,6 +1155,8 @@ export class PVPaybackCard extends LitElement {
     return {
       type: "custom:pv-payback-card",
       display_style: "full",
+      payback_date_format: "absolute",
+      payback_date_relative_reference: "now",
       show_breakdown: true,
       show_energy_values: true,
       show_money_values: true,
@@ -1314,6 +1381,39 @@ export class PVPaybackCard extends LitElement {
       : "—";
   }
 
+  private formatRelativeDate(date: Date | undefined, referenceDate: Date): string {
+    if (!date) return "—";
+    const t = this.text();
+    const startDay = calendarDay(referenceDate);
+    const targetDay = calendarDay(date);
+    if (targetDay.getTime() <= startDay.getTime()) return t.relativeOverdue;
+    const totalMonths =
+      (targetDay.getFullYear() - startDay.getFullYear()) * 12 +
+      (targetDay.getMonth() - startDay.getMonth()) -
+      (targetDay.getDate() < startDay.getDate() ? 1 : 0);
+    const years = Math.floor(totalMonths / 12);
+    const months = totalMonths % 12;
+    const parts: string[] = [];
+    if (years > 0) parts.push(`${years} ${years === 1 ? t.relativeYear : t.relativeYears}`);
+    if (months > 0) parts.push(`${months} ${months === 1 ? t.relativeMonth : t.relativeMonths}`);
+    if (parts.length === 0) return t.relativeThisMonth;
+    return `${t.relativeIn} ${parts.join(", ")}`;
+  }
+
+  private relativeReferenceDate(now: Date): Date {
+    if (this._config?.payback_date_relative_reference === "start_date") {
+      const start = new Date(`${this._config.start_date}T00:00:00`);
+      if (!Number.isNaN(start.getTime())) return start;
+    }
+    return now;
+  }
+
+  private formatPaybackDate(date: Date | undefined, now: Date): string {
+    return this._config?.payback_date_format === "relative"
+      ? this.formatRelativeDate(date, this.relativeReferenceDate(now))
+      : this.formatDate(date);
+  }
+
   private formatPercentage(value: number): string {
     return new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
       style: "percent",
@@ -1338,6 +1438,7 @@ export class PVPaybackCard extends LitElement {
   private renderScenarioDialog(
     scenarios: ScenarioCalculations,
     locationValid: boolean,
+    now: Date,
   ): TemplateResult {
     const t = this.text();
     const rows = [
@@ -1398,7 +1499,7 @@ export class PVPaybackCard extends LitElement {
                 </div>
                 <div>
                   <span>${t.expected}</span
-                  ><strong>${this.formatDate(scenario.paybackDate)}</strong>
+                  ><strong>${this.formatPaybackDate(scenario.paybackDate, now)}</strong>
                 </div>
               </div>
             </section>`,
@@ -1741,7 +1842,7 @@ export class PVPaybackCard extends LitElement {
                     aria-label=${`${t.scenariosOpen}: ${t.expected}`}
                     @click=${this.openScenarioDialog}
                     @keydown=${this.handleScenarioKeydown}
-                    >${this.formatDate(calc.paybackDate)}</b
+                    >${this.formatPaybackDate(calc.paybackDate, now)}</b
                   >
                 </div>`
               : nothing
@@ -1753,6 +1854,7 @@ export class PVPaybackCard extends LitElement {
           ? this.renderScenarioDialog(
               scenarios,
               validLocation(location.latitude, location.longitude),
+              now,
             )
           : nothing
       }

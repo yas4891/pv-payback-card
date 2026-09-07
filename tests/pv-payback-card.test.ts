@@ -898,6 +898,96 @@ describe("scenario dialog", () => {
   });
 });
 
+describe("relative payback date", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  async function createCard(language: "de" | "en" = "en"): Promise<PVPaybackCard> {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "10000", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "5000", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language },
+      config: { currency: "EUR" },
+    };
+    card.setConfig(config);
+    document.body.append(card);
+    await card.updateComplete;
+    return card;
+  }
+
+  it("shows a duration instead of a calendar date when configured", async () => {
+    const card = await createCard();
+    card.setConfig({ ...config, payback_date_format: "relative" });
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).toMatch(
+      /^in \d+ (year|years|month|months)(, \d+ (month|months))?$/,
+    );
+  });
+
+  it("keeps the absolute calendar date by default", async () => {
+    const card = await createCard();
+
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).not.toMatch(/^in /);
+  });
+
+  it("marks an already reached payback as overdue", async () => {
+    const card = await createCard();
+    card.setConfig({ ...config, investment_cost: 1, payback_date_format: "relative" });
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).toBe("overdue");
+  });
+
+  it("uses the total duration since the start date instead of the remaining time from today", async () => {
+    const card = await createCard();
+    // A high investment cost close to the accrued benefit keeps the payback date near "now"
+    // (overdue relative to today) while still landing well after the start date.
+    card.setConfig({
+      ...config,
+      investment_cost: 3000,
+      payback_date_format: "relative",
+    });
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).toBe("overdue");
+
+    card.setConfig({
+      ...config,
+      investment_cost: 3000,
+      payback_date_format: "relative",
+      payback_date_relative_reference: "start_date",
+    });
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).not.toBe("overdue");
+  });
+
+  it("localizes the relative payback date into German", async () => {
+    const card = await createCard("de");
+    card.setConfig({ ...config, investment_cost: 1, payback_date_format: "relative" });
+    await card.updateComplete;
+
+    expect(card.shadowRoot?.querySelector(".date b")?.textContent).toBe("überfällig");
+  });
+
+  it("also applies the relative format to the scenario dialog", async () => {
+    const card = await createCard();
+    card.setConfig({ ...config, investment_cost: 1, payback_date_format: "relative" });
+    await card.updateComplete;
+
+    (card.shadowRoot?.querySelector(".date b") as HTMLElement).click();
+    await card.updateComplete;
+
+    const dates = Array.from(
+      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-values div:last-child strong") ?? [],
+    ).map((element) => element.textContent);
+    expect(dates).toEqual(["overdue", "overdue", "overdue"]);
+  });
+});
+
 describe("configuration editor", () => {
   afterEach(() => {
     document.body.replaceChildren();
@@ -951,6 +1041,30 @@ describe("configuration editor", () => {
     expect(
       (editor.shadowRoot?.querySelector('[name="display_style"]') as HTMLSelectElement).value,
     ).toBe("compact");
+  });
+
+  it("selects the now reference by default and preserves the start date reference", async () => {
+    const editor = await createEditor();
+
+    editor.setConfig(config);
+    await editor.updateComplete;
+    expect(
+      (
+        editor.shadowRoot?.querySelector(
+          '[name="payback_date_relative_reference"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("now");
+
+    editor.setConfig({ ...config, payback_date_relative_reference: "start_date" });
+    await editor.updateComplete;
+    expect(
+      (
+        editor.shadowRoot?.querySelector(
+          '[name="payback_date_relative_reference"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("start_date");
   });
 
   it("passes the configured entity values to each picker", async () => {
@@ -1037,7 +1151,7 @@ describe("configuration editor", () => {
       "Export energy entity",
       "Self-consumption energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(17);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(19);
   });
 
   it("emits the complete configuration after an entity changes", async () => {
