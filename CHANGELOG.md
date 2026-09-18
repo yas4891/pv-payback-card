@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.5.2 - 2026-09-18
+
+- Added permanently visible contribution percentages below separated self-consumption and export segments.
+
 ## 0.5.1 - 2026-09-18
 
 - Restored a usable card width in Home Assistant sections dashboards.

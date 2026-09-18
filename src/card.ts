@@ -264,8 +264,11 @@ export class PVPaybackCard extends LitElement {
       Number(config.show_progress) +
       Number(config.show_breakdown && (config.show_energy_values || config.show_money_values)) +
       Number(config.show_payback_date);
-    if (config.display_style === "compact") return visibleBlocks > 1 ? 2 : 1;
-    return Math.max(1, 1 + visibleBlocks);
+    const contributionLabelRows = Number(config.show_progress && config.show_contribution_segments);
+    if (config.display_style === "compact") {
+      return (visibleBlocks > 1 ? 2 : 1) + contributionLabelRows;
+    }
+    return Math.max(1, 1 + visibleBlocks + contributionLabelRows);
   }
 
   getGridOptions(): { columns: number; rows: number; min_columns: number; min_rows: number } {
@@ -723,6 +726,22 @@ export class PVPaybackCard extends LitElement {
                         : html`<span style=${`width:${calc.progress}%`}></span>`
                     }
                   </span>
+                  ${
+                    config.show_contribution_segments
+                      ? html`<span class="contribution-percentages" aria-hidden="true">
+                          <span
+                            class="contribution-percentage-own"
+                            style=${`width:${ownContribution}%`}
+                            >${this.formatPercentage(ownShare)}</span
+                          >
+                          <span
+                            class="contribution-percentage-export"
+                            style=${`width:${exportContribution}%`}
+                            >${this.formatPercentage(exportShare)}</span
+                          >
+                        </span>`
+                      : nothing
+                  }
                   <span id="contribution-tooltip" class="progress-tooltip" role="tooltip">
                     <span class="tooltip-row tooltip-own">
                       <span>${t.own}</span>

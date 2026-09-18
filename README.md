@@ -29,7 +29,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 - Optional baseline values for counters that started before the accounting period.
 - Optional energy and monetary values in the detailed breakdown.
 - Progress tooltip with self-consumption and export contributions shown as percentages and money.
-- Optional blue and green contribution segments with clickable source-entity details.
+- Optional blue and green contribution segments with permanent percentage labels and clickable source-entity details.
 - Clickable benefit and payback values with a localized comparison of linear, seasonal, and discounted scenarios.
 - Cached last valid readings and visible warnings for unavailable or decreasing counters.
 - Localized German and English output.

@@ -290,4 +290,20 @@ describe("scenario dialog", () => {
     await card.updateComplete;
     expect(trigger.classList.contains("tooltip-open")).toBe(true);
   });
+
+  it("shows contribution percentages below their progress segments", async () => {
+    const card = await createCard();
+    card.setConfig({ ...config, show_contribution_segments: true });
+    await card.updateComplete;
+
+    const own = card.shadowRoot?.querySelector(".contribution-percentage-own") as HTMLElement;
+    const exported = card.shadowRoot?.querySelector(
+      ".contribution-percentage-export",
+    ) as HTMLElement;
+    expect(own.textContent).toBe("88.24%");
+    expect(own.getAttribute("style")).toBe("width:30%");
+    expect(exported.textContent).toBe("11.76%");
+    expect(exported.getAttribute("style")).toBe("width:4%");
+    expect(card.getGridOptions().rows).toBe(5);
+  });
 });

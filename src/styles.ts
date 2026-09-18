@@ -220,6 +220,26 @@ export const cardStyles = css`
     background: var(--success-color, #4caf50);
     border-radius: 0 99px 99px 0;
   }
+  .contribution-percentages {
+    display: flex;
+    width: 100%;
+    margin-top: 6px;
+    font-size: 0.78em;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .contribution-percentages > span {
+    flex-shrink: 0;
+    overflow: visible;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .contribution-percentage-own {
+    color: var(--info-color, #03a9f4);
+  }
+  .contribution-percentage-export {
+    color: var(--success-color, #4caf50);
+  }
   .progress-tooltip {
     position: absolute;
     z-index: 2;
