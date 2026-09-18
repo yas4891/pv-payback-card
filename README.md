@@ -1,10 +1,10 @@
-# PV Payback Card
+# Solar Payback Card
 
 [![HACS custom repository](https://img.shields.io/badge/HACS-Custom-orange.svg?style=flat-square)](https://hacs.xyz)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Validate](https://github.com/yas4891/pv-payback-card/actions/workflows/validate.yml/badge.svg)](https://github.com/yas4891/pv-payback-card/actions/workflows/validate.yml)
 
-PV Payback Card is a custom Lovelace card for [Home Assistant](https://www.home-assistant.io/). It estimates when a photovoltaic installation reaches payback from cumulative self-consumption and grid-export energy.
+Solar Payback Card is a custom Lovelace card for [Home Assistant](https://www.home-assistant.io/). It estimates when a photovoltaic installation reaches payback from cumulative self-consumption and grid-export energy.
 
 The card calculates the financial benefit directly in the browser. It needs no companion integration and no vendor-specific inverter integration. Configure cumulative production and export energy entities, or a direct self-consumption entity when available.
 
@@ -14,11 +14,11 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 
 ### Standard progress bar
 
-![PV Payback Card with the standard blue-to-green progress bar](docs/images/pv-payback-card-standard.png)
+![Solar Payback Card with the standard blue-to-green progress bar](docs/images/solar-payback-card-standard.png)
 
 ### Separate self-consumption and export contributions
 
-![PV Payback Card with blue self-consumption and green export contributions](docs/images/pv-payback-card-contribution-segments.png)
+![Solar Payback Card with blue self-consumption and green export contributions](docs/images/solar-payback-card-contribution-segments.png)
 
 ## Features
 
@@ -28,6 +28,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 - Optional location-aware seasonal forecast, calculated locally from the Home Assistant location.
 - Optional baseline values for counters that started before the accounting period.
 - Optional energy and monetary values in the detailed breakdown.
+- Progress tooltip with self-consumption and export contributions shown as percentages and money.
 - Optional blue and green contribution segments with clickable source-entity details.
 - Clickable benefit and payback values with a localized comparison of linear, seasonal, and discounted scenarios.
 - Cached last valid readings and visible warnings for unavailable or decreasing counters.
@@ -48,7 +49,7 @@ This repository is currently installed as a HACS custom repository.
 
 1. Select the button above from a device that can open your Home Assistant instance.
 2. Confirm the custom repository as type **Dashboard**.
-3. Open HACS, select **PV Payback Card**, and choose **Download**.
+3. Open HACS, select **Solar Payback Card**, and choose **Download**.
 4. Reload the browser when HACS finishes.
 5. Add the card through the dashboard editor and configure its entities.
 
@@ -76,7 +77,7 @@ type: module
 
 ```yaml
 type: custom:pv-payback-card
-name: PV payback
+name: Solar payback
 start_date: "2024-12-01"
 investment_cost: 17653.06
 electricity_price: 0.20
@@ -117,7 +118,7 @@ These options cover the normal production-based setup, pricing, card identity, a
 | `export_energy_entity`       | Yes      | —                         | Entity with total energy exported to the grid. The entity must expose a cumulative numeric value in `Wh`, `kWh`, or `MWh`. Example: `sensor.pv_export_total`.                                                                                                                                    |
 | `production_energy_baseline` | No       | `0`                       | Production counter reading at `start_date`, in `kWh`. Negative values can carry production forward after a counter replacement. Example: `-20000`.                                                                                                                                               |
 | `export_energy_baseline`     | No       | `0`                       | Export counter reading at `start_date`, in `kWh`. Negative values can carry exported energy forward after a counter replacement. Example: `-5000`.                                                                                                                                               |
-| `name`                       | No       | Localized title           | Card heading. Example: `"PV payback"`.                                                                                                                                                                                                                                                           |
+| `name`                       | No       | Localized title           | Card heading. Example: `"Solar payback"`.                                                                                                                                                                                                                                                        |
 | `icon`                       | No       | `mdi:solar-power-variant` | Material Design icon in the card heading. Example: `mdi:solar-power-variant`.                                                                                                                                                                                                                    |
 | `currency`                   | No       | Home Assistant currency   | ISO 4217 currency code for displayed monetary values. Example: `EUR`, `USD`, or `GBP`.                                                                                                                                                                                                           |
 | `locale`                     | No       | Home Assistant language   | Language and number format override. Example: `de-DE` or `en-US`. German and English card texts are included.                                                                                                                                                                                    |

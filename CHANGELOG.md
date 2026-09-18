@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-18
+
+- Added an interactive progress tooltip with self-consumption and export contributions shown as percentages and money.
+- Renamed the card to Solar Payback Card while keeping existing configurations compatible.
+
 ## 0.4.3 - 2026-08-31
 
 - Restored the latest valid cumulative energy reading from Home Assistant recorder history when the browser cache is empty.

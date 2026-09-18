@@ -1,0 +1,17 @@
+name: HACS validation
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  validate-hacs:
+    name: Validate HACS plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: plugin

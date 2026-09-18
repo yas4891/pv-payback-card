@@ -1,6 +1,6 @@
 {
   "name": "pv-payback-card",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "release:check": "node scripts/check-release-consistency.mjs"
   },
   "dependencies": {
     "lit": "^3.3.1"
