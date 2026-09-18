@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.5.1 - 2026-09-18
+
+- Restored a usable card width in Home Assistant sections dashboards.
+
 ## 0.5.0 - 2026-09-18
 
 - Added an interactive progress tooltip with self-consumption and export contributions shown as percentages and money.

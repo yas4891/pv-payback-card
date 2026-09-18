@@ -271,9 +271,9 @@ export class PVPaybackCard extends LitElement {
   getGridOptions(): { columns: number; rows: number; min_columns: number; min_rows: number } {
     const compact = this._config?.display_style === "compact";
     return {
-      columns: compact ? 3 : 4,
+      columns: compact ? 6 : 12,
       rows: this.getCardSize(),
-      min_columns: compact ? 2 : 3,
+      min_columns: compact ? 6 : 9,
       min_rows: 1,
     };
   }

@@ -1593,9 +1593,9 @@ class Ct extends P {
   getGridOptions() {
     const e = this._config?.display_style === "compact";
     return {
-      columns: e ? 3 : 4,
+      columns: e ? 6 : 12,
       rows: this.getCardSize(),
-      min_columns: e ? 2 : 3,
+      min_columns: e ? 6 : 9,
       min_rows: 1
     };
   }

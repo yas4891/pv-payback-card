@@ -37,6 +37,18 @@ describe("update filtering", () => {
   });
 });
 
+describe("sections grid sizing", () => {
+  it("keeps the full layout wide and gives the compact layout half width", () => {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+
+    card.setConfig(config);
+    expect(card.getGridOptions()).toMatchObject({ columns: 12, min_columns: 9 });
+
+    card.setConfig({ ...config, display_style: "compact" });
+    expect(card.getGridOptions()).toMatchObject({ columns: 6, min_columns: 6 });
+  });
+});
+
 describe("persistent warning delay", () => {
   afterEach(() => {
     vi.useRealTimers();
