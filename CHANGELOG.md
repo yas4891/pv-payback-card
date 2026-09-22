@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-09-22
+
+- You can now show the payback duration in years, months, and days from today or your accounting start date.
+
 ## 0.5.2 - 2026-09-18
 
 - Added permanently visible contribution percentages below separated self-consumption and export segments.

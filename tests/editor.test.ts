@@ -70,6 +70,30 @@ describe("configuration editor", () => {
     ).toBe("compact");
   });
 
+  it("shows the relative reference only when relative dates are selected", async () => {
+    const editor = await createEditor();
+    editor.setConfig({ ...config, self_consumption_entity: "sensor.own" });
+    await editor.updateComplete;
+    expect(
+      (editor.shadowRoot?.querySelector('[name="payback_date_format"]') as HTMLSelectElement).value,
+    ).toBe("absolute");
+    expect(editor.shadowRoot?.querySelector('[name="payback_date_relative_reference"]')).toBeNull();
+
+    editor.setConfig({
+      ...config,
+      payback_date_format: "relative",
+      payback_date_relative_reference: "start_date",
+    });
+    await editor.updateComplete;
+    expect(
+      (
+        editor.shadowRoot?.querySelector(
+          '[name="payback_date_relative_reference"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("start_date");
+  });
+
   it("passes the configured entity values to each picker", async () => {
     const editor = await createEditor();
 
@@ -154,7 +178,7 @@ describe("configuration editor", () => {
       "Export energy entity",
       "Self-consumption energy entity",
     ]);
-    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(17);
+    expect(editor.shadowRoot?.querySelectorAll("label")).toHaveLength(18);
   });
 
   it("emits the complete configuration after an entity changes", async () => {

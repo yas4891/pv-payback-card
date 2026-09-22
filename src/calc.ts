@@ -5,6 +5,8 @@ export type Unit = "Wh" | "kWh" | "MWh";
 export type PVPaybackCardConfig = {
   type: string;
   display_style?: "full" | "compact";
+  payback_date_format?: "absolute" | "relative";
+  payback_date_relative_reference?: "now" | "start_date";
   start_date: string;
   investment_cost: number;
   electricity_price: number;
@@ -117,6 +119,8 @@ export function withDisplayDefaults(config: PVPaybackCardConfig): PVPaybackCardC
   return {
     ...config,
     display_style: config.display_style ?? "full",
+    payback_date_format: config.payback_date_format ?? "absolute",
+    payback_date_relative_reference: config.payback_date_relative_reference ?? "now",
     show_breakdown: config.show_breakdown ?? true,
     show_energy_values: config.show_energy_values ?? true,
     show_money_values: config.show_money_values ?? true,
@@ -151,6 +155,38 @@ function linearPaybackDate(
 
 export function calendarDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** Counts complete calendar months, then the remaining calendar days. */
+export function calendarDuration(
+  start: Date,
+  end: Date,
+): {
+  years: number;
+  months: number;
+  days: number;
+} {
+  const startDay = calendarDay(start);
+  const endDay = calendarDay(end);
+  const startUtc = Date.UTC(startDay.getFullYear(), startDay.getMonth(), startDay.getDate());
+  const endUtc = Date.UTC(endDay.getFullYear(), endDay.getMonth(), endDay.getDate());
+  if (endUtc < startUtc) throw new RangeError("End date must not precede start date.");
+
+  const monthAnchor = (months: number): number => {
+    const firstDay = new Date(Date.UTC(startDay.getFullYear(), startDay.getMonth() + months, 1));
+    const year = firstDay.getUTCFullYear();
+    const month = firstDay.getUTCMonth();
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return Date.UTC(year, month, Math.min(startDay.getDate(), lastDay));
+  };
+  let completeMonths =
+    (endDay.getFullYear() - startDay.getFullYear()) * 12 + endDay.getMonth() - startDay.getMonth();
+  if (monthAnchor(completeMonths) > endUtc) completeMonths -= 1;
+  return {
+    years: Math.floor(completeMonths / 12),
+    months: completeMonths % 12,
+    days: Math.round((endUtc - monthAnchor(completeMonths)) / 86_400_000),
+  };
 }
 
 function solarPotentialWeight(date: Date, latitude: number): number {
@@ -697,6 +733,16 @@ export function chooseEnergyValue(
 export function validConfig(config: PVPaybackCardConfig): string | undefined {
   if (config.display_style !== undefined && !["full", "compact"].includes(config.display_style))
     return "display_style";
+  if (
+    config.payback_date_format !== undefined &&
+    !["absolute", "relative"].includes(config.payback_date_format)
+  )
+    return "payback_date_format";
+  if (
+    config.payback_date_relative_reference !== undefined &&
+    !["now", "start_date"].includes(config.payback_date_relative_reference)
+  )
+    return "payback_date_relative_reference";
   if (!config.start_date || Number.isNaN(new Date(`${config.start_date}T00:00:00`).getTime()))
     return "start_date";
   for (const key of ["investment_cost", "electricity_price", "feed_in_tariff"] as const) {

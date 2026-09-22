@@ -4,6 +4,7 @@ import {
   assertConfigStructure,
   cacheKey,
   calendarDay,
+  calendarDuration,
   calculatePayback,
   calculateScenarioComparisons,
   chooseEnergyValue,
@@ -69,6 +70,8 @@ export class PVPaybackCard extends LitElement {
     return {
       type: "custom:pv-payback-card",
       display_style: "full",
+      payback_date_format: "absolute",
+      payback_date_relative_reference: "now",
       show_breakdown: true,
       show_energy_values: true,
       show_money_values: true,
@@ -358,6 +361,30 @@ export class PVPaybackCard extends LitElement {
       : "—";
   }
 
+  private formatPaybackDate(date: Date | undefined, now: Date): string {
+    if (this._config?.payback_date_format !== "relative") return this.formatDate(date);
+    if (!date) return "—";
+
+    const t = this.text();
+    const fromStartDate = this._config.payback_date_relative_reference === "start_date";
+    const reference = fromStartDate ? new Date(`${this._config.start_date}T00:00:00`) : now;
+    const targetDay = calendarDay(date);
+    const referenceDay = calendarDay(reference);
+    if (targetDay.getTime() < referenceDay.getTime()) {
+      return fromStartDate ? t.relativeBeforeStartDate : t.relativeOverdue;
+    }
+    if (targetDay.getTime() === referenceDay.getTime()) {
+      return fromStartDate ? t.relativeOnStartDate : t.relativeToday;
+    }
+
+    const { years, months, days } = calendarDuration(referenceDay, targetDay);
+    const parts: string[] = [];
+    if (years) parts.push(`${years} ${years === 1 ? t.relativeYear : t.relativeYears}`);
+    if (months) parts.push(`${months} ${months === 1 ? t.relativeMonth : t.relativeMonths}`);
+    if (days) parts.push(`${days} ${days === 1 ? t.relativeDay : t.relativeDays}`);
+    return `${fromStartDate ? t.relativeAfter : t.relativeIn} ${parts.join(", ")}`;
+  }
+
   private formatPercentage(value: number): string {
     return new Intl.NumberFormat(this._config?.locale ?? this.hass?.locale?.language, {
       style: "percent",
@@ -390,6 +417,7 @@ export class PVPaybackCard extends LitElement {
   private renderScenarioDialog(
     scenarios: ScenarioCalculations,
     locationValid: boolean,
+    now: Date,
   ): TemplateResult {
     const t = this.text();
     const rows = [
@@ -450,7 +478,7 @@ export class PVPaybackCard extends LitElement {
                 </div>
                 <div>
                   <span>${t.expected}</span
-                  ><strong>${this.formatDate(scenario.paybackDate)}</strong>
+                  ><strong>${this.formatPaybackDate(scenario.paybackDate, now)}</strong>
                 </div>
               </div>
             </section>`,
@@ -818,7 +846,7 @@ export class PVPaybackCard extends LitElement {
                     aria-label=${`${t.scenariosOpen}: ${t.expected}`}
                     @click=${this.openScenarioDialog}
                   >
-                    ${this.formatDate(calc.paybackDate)}
+                    ${this.formatPaybackDate(calc.paybackDate, now)}
                   </button>
                 </div>`
               : nothing
@@ -830,6 +858,7 @@ export class PVPaybackCard extends LitElement {
           ? this.renderScenarioDialog(
               scenarios,
               validLocation(location.latitude, location.longitude),
+              now,
             )
           : nothing
       }
