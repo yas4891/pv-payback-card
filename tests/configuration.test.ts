@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "../src/pv-payback-card";
-import type { PVPaybackCard, PVPaybackCardConfig } from "../src/pv-payback-card";
+import { validConfig, type PVPaybackCard, type PVPaybackCardConfig } from "../src/pv-payback-card";
 
 const config: PVPaybackCardConfig = {
   type: "custom:pv-payback-card",
@@ -13,6 +13,14 @@ const config: PVPaybackCardConfig = {
 };
 
 describe("configuration validation", () => {
+  it("rejects invalid payback date choices", () => {
+    expect(validConfig({ ...config, payback_date_format: "unknown" as "relative" })).toBe(
+      "payback_date_format",
+    );
+    expect(validConfig({ ...config, payback_date_relative_reference: "yesterday" as "now" })).toBe(
+      "payback_date_relative_reference",
+    );
+  });
   it("throws for a missing energy-source structure", () => {
     const card = document.createElement("pv-payback-card") as PVPaybackCard;
     expect(() =>

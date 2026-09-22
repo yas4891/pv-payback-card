@@ -33,7 +33,8 @@ export class PVPaybackCardEditor extends LitElement {
       config.show_energy_values === false ||
       config.show_money_values === false ||
       config.show_payback_date === false ||
-      config.show_progress === false
+      config.show_progress === false ||
+      config.payback_date_format === "relative"
     ) {
       this._advancedOpen = true;
     }
@@ -204,8 +205,35 @@ export class PVPaybackCardEditor extends LitElement {
               ${this.entityField("self_consumption_entity", text.self_consumption_entity)}
               ${advancedFields.map(textField)} ${checkboxField("show_breakdown")}
               ${checkboxField("show_energy_values")} ${checkboxField("show_money_values")}
-              ${checkboxField("show_payback_date")} ${checkboxField("show_progress")}
-              ${checkboxField("use_location_seasonality")} ${checkboxField("apply_annual_discount")}
+              ${checkboxField("show_payback_date")}
+              <label
+                >${text.payback_date_format}<select
+                  name="payback_date_format"
+                  .value=${this._config.payback_date_format ?? "absolute"}
+                  @change=${this.changed}
+                >
+                  <option value="absolute">${text.payback_date_format_absolute}</option>
+                  <option value="relative">${text.payback_date_format_relative}</option>
+                </select></label
+              >
+              ${
+                this._config.payback_date_format === "relative"
+                  ? html`<label
+                      >${text.payback_date_relative_reference}<select
+                        name="payback_date_relative_reference"
+                        .value=${this._config.payback_date_relative_reference ?? "now"}
+                        @change=${this.changed}
+                      >
+                        <option value="now">${text.payback_date_relative_reference_now}</option>
+                        <option value="start_date">
+                          ${text.payback_date_relative_reference_start_date}
+                        </option>
+                      </select></label
+                    >`
+                  : nothing
+              }
+              ${checkboxField("show_progress")} ${checkboxField("use_location_seasonality")}
+              ${checkboxField("apply_annual_discount")}
             </section>`
           : nothing
       }`;

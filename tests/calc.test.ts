@@ -3,6 +3,7 @@ import {
   PVPaybackCard,
   appliesAnnualDiscount,
   cacheKey,
+  calendarDuration,
   calculatePayback,
   calculateScenarioComparisons,
   calculateSeasonalPaybackDate,
@@ -25,6 +26,37 @@ const config: PVPaybackCardConfig = {
   self_consumption_entity: "sensor.own",
   export_energy_entity: "sensor.export",
 };
+
+describe("calendarDuration", () => {
+  it("keeps years, months, and remaining days", () => {
+    expect(calendarDuration(new Date(2026, 1, 10), new Date(2028, 4, 31))).toEqual({
+      years: 2,
+      months: 3,
+      days: 21,
+    });
+  });
+
+  it("handles the end of February and leap years", () => {
+    expect(calendarDuration(new Date(2024, 0, 31), new Date(2024, 1, 29))).toEqual({
+      years: 0,
+      months: 1,
+      days: 0,
+    });
+    expect(calendarDuration(new Date(2024, 1, 29), new Date(2025, 1, 28))).toEqual({
+      years: 1,
+      months: 0,
+      days: 0,
+    });
+  });
+
+  it("counts calendar days across a daylight-saving change", () => {
+    expect(calendarDuration(new Date(2026, 2, 28), new Date(2026, 2, 30))).toEqual({
+      years: 0,
+      months: 0,
+      days: 2,
+    });
+  });
+});
 
 describe("energyToKwh", () => {
   it("converts supported cumulative energy units", () => {
@@ -384,6 +416,8 @@ describe("display configuration", () => {
   it("enables detailed energy and monetary values by default", () => {
     expect(withDisplayDefaults(config)).toMatchObject({
       display_style: "full",
+      payback_date_format: "absolute",
+      payback_date_relative_reference: "now",
       show_breakdown: true,
       show_energy_values: true,
       show_money_values: true,

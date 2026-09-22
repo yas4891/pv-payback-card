@@ -307,3 +307,80 @@ describe("scenario dialog", () => {
     expect(card.getGridOptions().rows).toBe(5);
   });
 });
+
+describe("relative payback date", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.replaceChildren();
+  });
+
+  function createCard(language: "de" | "en" = "en"): PVPaybackCard {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "10000", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "5000", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language },
+      config: { currency: "EUR", latitude: 52.52, longitude: 13.405 },
+    };
+    return card;
+  }
+
+  it("keeps the calendar date by default and renders a relative duration when selected", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 22, 12));
+    const card = createCard();
+    card.setConfig(config);
+    document.body.append(card);
+    await card.updateComplete;
+    expect(
+      card.shadowRoot?.querySelector(".date .scenario-trigger")?.textContent?.trim(),
+    ).not.toMatch(/^in /);
+
+    card.setConfig({ ...config, payback_date_format: "relative" });
+    await card.updateComplete;
+    expect(card.shadowRoot?.querySelector(".date .scenario-trigger")?.textContent?.trim()).toMatch(
+      /^in \d+ (year|years|month|months|day|days)/,
+    );
+
+    (card.shadowRoot?.querySelector(".date .scenario-trigger") as HTMLButtonElement).click();
+    await card.updateComplete;
+    const dates = Array.from(
+      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-values div:last-child strong") ?? [],
+    ).map((element) => element.textContent?.trim());
+    expect(dates).toHaveLength(3);
+    expect(dates.every((value) => value?.startsWith("in "))).toBe(true);
+  });
+
+  it("shows days, today, and overdue without rounding them to a month", () => {
+    const card = createCard();
+    card.setConfig({ ...config, payback_date_format: "relative" });
+    const format = (
+      card as unknown as { formatPaybackDate: (date: Date, now: Date) => string }
+    ).formatPaybackDate.bind(card);
+    const today = new Date(2026, 8, 22, 12);
+
+    expect(format(new Date(2026, 8, 24), today)).toBe("in 2 days");
+    expect(format(new Date(2026, 8, 22), today)).toBe("today");
+    expect(format(new Date(2026, 8, 21), today)).toBe("overdue");
+  });
+
+  it("shows total time from the start date with German grammar", () => {
+    const card = createCard("de");
+    card.setConfig({
+      ...config,
+      start_date: "2025-02-10",
+      payback_date_format: "relative",
+      payback_date_relative_reference: "start_date",
+    });
+    const format = (
+      card as unknown as { formatPaybackDate: (date: Date, now: Date) => string }
+    ).formatPaybackDate.bind(card);
+
+    expect(format(new Date(2027, 4, 31), new Date(2026, 8, 22))).toBe(
+      "nach 2 Jahren, 3 Monaten, 21 Tagen",
+    );
+    expect(format(new Date(2025, 1, 10), new Date(2026, 8, 22))).toBe("am Startdatum");
+  });
+});
