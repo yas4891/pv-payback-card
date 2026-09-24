@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-09-24
+
+- You can now assign custom per-kWh values to individual PV-only consumers without counting their energy twice.
+- You can now configure individual consumers, baselines, and icons directly in the visual editor.
+- Scenario comparisons now show the calendar date, remaining time, and total payback duration together.
+
 ## 0.6.0 - 2026-09-22
 
 - You can now show the payback duration in years, months, and days from today or your accounting start date.

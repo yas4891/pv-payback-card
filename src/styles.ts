@@ -52,6 +52,45 @@ export const editorStyles = css`
     color: var(--secondary-text-color);
     font-size: 0.9em;
   }
+  .individual-consumers {
+    margin: 18px 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .individual-consumers h3 {
+    margin: 0 0 6px;
+    font-size: 1em;
+  }
+  .individual-consumers p {
+    margin: 0 0 12px;
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+  }
+  .individual-consumers fieldset {
+    margin: 12px 0;
+    padding: 8px 12px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+  }
+  .individual-consumers legend {
+    padding: 0 4px;
+    font-weight: 600;
+  }
+  .add-consumer,
+  .remove-consumer {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    border-radius: 6px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .remove-consumer {
+    border-color: var(--error-color, #db4437);
+    color: var(--error-color, #db4437);
+  }
 `;
 
 export const cardStyles = css`
@@ -295,6 +334,9 @@ export const cardStyles = css`
   .tooltip-row.tooltip-export {
     color: var(--success-color, #4caf50);
   }
+  .tooltip-row.tooltip-individual {
+    color: var(--primary-text-color);
+  }
   .breakdown {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -325,6 +367,16 @@ export const cardStyles = css`
   }
   .breakdown b {
     font-size: 0.92em;
+  }
+  .breakdown-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .breakdown-label ha-icon {
+    width: 18px;
+    height: 18px;
+    color: inherit;
   }
   .breakdown-action {
     padding: 0;
@@ -382,8 +434,10 @@ export const cardStyles = css`
   }
   .scenario-dialog {
     display: grid;
+    width: min(920px, calc(100vw - 48px));
+    max-width: 100%;
     gap: 12px;
-    min-width: min(520px, 75vw);
+    min-width: min(760px, calc(100vw - 48px));
     padding-bottom: 8px;
   }
   .scenario {
@@ -427,15 +481,32 @@ export const cardStyles = css`
   }
   .scenario-values {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    grid-template-columns: minmax(100px, 0.8fr) repeat(3, minmax(120px, 1fr));
+    gap: 12px;
   }
   .scenario-values div {
     display: grid;
+    min-width: 0;
     gap: 4px;
+  }
+  .scenario-values span {
+    font-size: 0.88em;
+    line-height: 1.25;
+  }
+  .scenario-values strong {
+    overflow-wrap: anywhere;
   }
   .scenario-values strong:last-child {
     text-align: end;
+  }
+  @media (max-width: 520px) {
+    .scenario-dialog {
+      width: auto;
+      min-width: 0;
+    }
+    .scenario-values {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   @media (max-width: 360px) {
     .breakdown {
@@ -463,9 +534,6 @@ export const cardStyles = css`
     .content.compact .date b,
     .content.compact .date .scenario-trigger {
       text-align: end;
-    }
-    .scenario-dialog {
-      min-width: 0;
     }
     .scenario-values {
       grid-template-columns: 1fr;

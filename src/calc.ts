@@ -2,6 +2,14 @@ import type { HomeAssistant } from "./card";
 
 export type Unit = "Wh" | "kWh" | "MWh";
 
+export type IndividualConsumerConfig = {
+  name: string;
+  entity: string;
+  value_per_kwh: number;
+  baseline?: number;
+  icon?: string;
+};
+
 export type PVPaybackCardConfig = {
   type: string;
   display_style?: "full" | "compact";
@@ -17,6 +25,7 @@ export type PVPaybackCardConfig = {
   self_consumption_baseline?: number;
   production_energy_baseline?: number;
   export_energy_baseline?: number;
+  individual_consumers?: IndividualConsumerConfig[];
   name?: string;
   icon?: string;
   currency?: string;
@@ -43,7 +52,17 @@ export type HistoryState = {
   last_updated?: unknown;
 };
 export type EntityHistory = Record<string, HistoryState[]>;
-export type DailyEnergy = { date: string; selfConsumption: number; exported: number };
+export type DailyEnergy = {
+  date: string;
+  selfConsumption: number;
+  exported: number;
+  individualConsumers?: Record<string, number>;
+};
+
+export type IndividualConsumerContribution = IndividualConsumerConfig & {
+  energy: number;
+  value: number;
+};
 
 export type EnergyRead = {
   value?: number;
@@ -55,6 +74,9 @@ export type EnergyRead = {
 export type CachedEnergy = { value: number; timestamp?: string };
 export type Calculation = {
   selfConsumption: number;
+  regularSelfConsumption: number;
+  individualConsumers: IndividualConsumerContribution[];
+  individualConsumptionExceedsTotal: boolean;
   exported: number;
   ownValue: number;
   exportValue: number;
@@ -326,6 +348,12 @@ export function dailyEnergyFromStatistics(
   const production = config.production_energy_entity
     ? statisticDailyDeltas(statistics?.[config.production_energy_entity])
     : undefined;
+  const individualSources = new Map(
+    (config.individual_consumers ?? []).map((consumer) => [
+      consumer.entity,
+      statisticDailyDeltas(statistics?.[consumer.entity]),
+    ]),
+  );
   const dates = new Set<string>([
     ...exported.keys(),
     ...(ownSource?.keys() ?? []),
@@ -340,7 +368,20 @@ export function dailyEnergyFromStatistics(
         ? undefined
         : Math.max(0, production.get(date)! - exportValue);
     if (selfValue === undefined || !Number.isFinite(selfValue) || selfValue < 0) return [];
-    return [{ date, selfConsumption: selfValue, exported: exportValue }];
+    return [
+      {
+        date,
+        selfConsumption: selfValue,
+        exported: exportValue,
+        ...(individualSources.size > 0
+          ? {
+              individualConsumers: Object.fromEntries(
+                [...individualSources].map(([entity, values]) => [entity, values.get(date) ?? 0]),
+              ),
+            }
+          : {}),
+      },
+    ];
   });
 }
 
@@ -351,7 +392,12 @@ export function historicalStatisticsCacheKey(
   const sources = config.self_consumption_entity
     ? ["direct", config.self_consumption_entity, config.export_energy_entity]
     : ["derived", config.production_energy_entity, config.export_energy_entity];
-  return JSON.stringify([sources, config.start_date, completedEndDate]);
+  return JSON.stringify([
+    sources,
+    (config.individual_consumers ?? []).map((consumer) => consumer.entity),
+    config.start_date,
+    completedEndDate,
+  ]);
 }
 
 export function loadHistoricalStatistics(
@@ -375,6 +421,7 @@ export function loadHistoricalStatistics(
   const statisticIds = config.self_consumption_entity
     ? [config.self_consumption_entity, config.export_energy_entity]
     : [config.production_energy_entity!, config.export_energy_entity];
+  statisticIds.push(...(config.individual_consumers ?? []).map((consumer) => consumer.entity));
   const request = hass
     .callWS({
       type: "recorder/statistics_during_period",
@@ -419,6 +466,7 @@ export function distributeHistoricalEnergy(
   now: Date,
   location?: { latitude?: number; longitude?: number },
   historicalDays?: DailyEnergy[],
+  individualConsumers: IndividualConsumerContribution[] = [],
 ): DailyEnergy[] {
   const start = new Date(`${config.start_date}T00:00:00`);
   if (Number.isNaN(start.getTime()) || start > now) return [];
@@ -442,10 +490,34 @@ export function distributeHistoricalEnergy(
   };
   const own = distribute(Math.max(0, selfConsumption), "selfConsumption");
   const exportValues = distribute(Math.max(0, exported), "exported");
+  const individualValues = new Map(
+    individualConsumers.map((consumer) => {
+      const observed = weights.map(({ date }) =>
+        Math.max(0, historic.get(dateKey(date))?.individualConsumers?.[consumer.entity] ?? 0),
+      );
+      const observedTotal = observed.reduce((sum, value) => sum + value, 0);
+      const fallbackTotal = weights.reduce(
+        (sum, day, index) => sum + (observed[index] > 0 ? 0 : day.weight),
+        0,
+      );
+      const values = weights.map((day, index) => {
+        if (observedTotal > 0 && observed[index] > 0) return observed[index];
+        return fallbackTotal > 0 ? (consumer.energy * day.weight) / fallbackTotal : 0;
+      });
+      const rawTotal = values.reduce((sum, value) => sum + value, 0);
+      return [
+        consumer.entity,
+        rawTotal > 0 ? values.map((value) => (value * consumer.energy) / rawTotal) : values,
+      ] as const;
+    }),
+  );
   return weights.map((day, index) => ({
     date: dateKey(day.date),
     selfConsumption: own[index],
     exported: exportValues[index],
+    individualConsumers: Object.fromEntries(
+      [...individualValues].map(([entity, values]) => [entity, values[index]]),
+    ),
   }));
 }
 
@@ -454,24 +526,44 @@ function discountedPaybackDate(
   now: Date,
   dailyEnergy: DailyEnergy[],
   location?: { latitude?: number; longitude?: number },
-): { ownValue: number; exportValue: number; paybackDate?: Date } {
+): {
+  regularValue: number;
+  individualValues: Record<string, number>;
+  exportValue: number;
+  paybackDate?: Date;
+} {
   const start = new Date(`${config.start_date}T00:00:00`);
   const rate = config.annual_discount_rate ?? 0;
-  let ownValue = 0;
+  let regularValue = 0;
+  const individualValues: Record<string, number> = {};
   let exportValue = 0;
   let accumulated = 0;
   let historicalPaybackDate: Date | undefined;
   for (const day of dailyEnergy) {
     const date = new Date(`${day.date}T00:00:00`);
-    const own = day.selfConsumption * config.electricity_price * discountFactor(date, start, rate);
+    const factor = discountFactor(date, start, rate);
+    const individualEnergy = (config.individual_consumers ?? []).reduce(
+      (sum, consumer) => sum + (day.individualConsumers?.[consumer.entity] ?? 0),
+      0,
+    );
+    const own =
+      Math.max(0, day.selfConsumption - individualEnergy) * config.electricity_price * factor;
     const exported = day.exported * config.feed_in_tariff * discountFactor(date, start, rate);
-    ownValue += own;
+    regularValue += own;
+    let individualValue = 0;
+    for (const consumer of config.individual_consumers ?? []) {
+      const value =
+        (day.individualConsumers?.[consumer.entity] ?? 0) * consumer.value_per_kwh * factor;
+      individualValues[consumer.entity] = (individualValues[consumer.entity] ?? 0) + value;
+      individualValue += value;
+    }
     exportValue += exported;
-    accumulated += own + exported;
+    accumulated += own + individualValue + exported;
     if (!historicalPaybackDate && accumulated >= config.investment_cost)
       historicalPaybackDate = date;
   }
-  if (historicalPaybackDate) return { ownValue, exportValue, paybackDate: historicalPaybackDate };
+  if (historicalPaybackDate)
+    return { regularValue, individualValues, exportValue, paybackDate: historicalPaybackDate };
   const seasonal =
     config.use_location_seasonality && validLocation(location?.latitude, location?.longitude);
   const observedWeights = dailyEnergy.reduce(
@@ -482,10 +574,26 @@ function discountedPaybackDate(
   );
   const nominalBenefit = dailyEnergy.reduce(
     (sum, day) =>
-      sum + day.selfConsumption * config.electricity_price + day.exported * config.feed_in_tariff,
+      sum +
+      Math.max(
+        0,
+        day.selfConsumption -
+          (config.individual_consumers ?? []).reduce(
+            (total, consumer) => total + (day.individualConsumers?.[consumer.entity] ?? 0),
+            0,
+          ),
+      ) *
+        config.electricity_price +
+      (config.individual_consumers ?? []).reduce(
+        (total, consumer) =>
+          total + (day.individualConsumers?.[consumer.entity] ?? 0) * consumer.value_per_kwh,
+        0,
+      ) +
+      day.exported * config.feed_in_tariff,
     0,
   );
-  if (observedWeights <= 0 || nominalBenefit <= 0) return { ownValue, exportValue };
+  if (observedWeights <= 0 || nominalBenefit <= 0)
+    return { regularValue, individualValues, exportValue };
   const benefitPerWeight = nominalBenefit / observedWeights;
   const forecastDay = calendarDay(now);
   for (let offset = 0; offset < MAXIMUM_FORECAST_DAYS; offset += 1) {
@@ -493,9 +601,9 @@ function discountedPaybackDate(
     const weight = seasonal ? solarPotentialWeight(forecastDay, location!.latitude!) : 1;
     accumulated += benefitPerWeight * weight * discountFactor(forecastDay, start, rate);
     if (accumulated >= config.investment_cost)
-      return { ownValue, exportValue, paybackDate: new Date(forecastDay) };
+      return { regularValue, individualValues, exportValue, paybackDate: new Date(forecastDay) };
   }
-  return { ownValue, exportValue };
+  return { regularValue, individualValues, exportValue };
 }
 
 export function calculatePayback(
@@ -505,6 +613,7 @@ export function calculatePayback(
   now = new Date(),
   location?: { latitude?: number; longitude?: number },
   historicalDays?: DailyEnergy[],
+  individualConsumerReadings: Record<string, number> = {},
 ): Calculation {
   const exportEnergy = Math.max(0, exported - (config.export_energy_baseline ?? 0));
   const own = config.self_consumption_entity
@@ -513,7 +622,25 @@ export function calculatePayback(
         0,
         selfConsumptionOrProduction - (config.production_energy_baseline ?? 0) - exportEnergy,
       );
-  const nominalOwnValue = own * config.electricity_price;
+  const individualConsumers = (config.individual_consumers ?? []).map((consumer) => ({
+    ...consumer,
+    energy: Math.max(
+      0,
+      (individualConsumerReadings[consumer.entity] ?? 0) - (consumer.baseline ?? 0),
+    ),
+    value: 0,
+  }));
+  const individualEnergy = individualConsumers.reduce((sum, consumer) => sum + consumer.energy, 0);
+  const regularSelfConsumption = Math.max(0, own - individualEnergy);
+  const individualConsumptionExceedsTotal = individualEnergy > own;
+  const nominalRegularValue = regularSelfConsumption * config.electricity_price;
+  const nominalIndividualConsumers = individualConsumers.map((consumer) => ({
+    ...consumer,
+    value: consumer.energy * consumer.value_per_kwh,
+  }));
+  const nominalOwnValue =
+    nominalRegularValue +
+    nominalIndividualConsumers.reduce((sum, consumer) => sum + consumer.value, 0);
   const nominalExportValue = exportEnergy * config.feed_in_tariff;
   if (appliesAnnualDiscount(config) && (config.annual_discount_rate ?? 0) > 0) {
     const dailyEnergy = distributeHistoricalEnergy(
@@ -523,13 +650,24 @@ export function calculatePayback(
       now,
       location,
       historicalDays,
+      individualConsumers,
     );
     const discounted = discountedPaybackDate(config, now, dailyEnergy, location);
-    const benefit = discounted.ownValue + discounted.exportValue;
+    const discountedIndividualConsumers = individualConsumers.map((consumer) => ({
+      ...consumer,
+      value: discounted.individualValues[consumer.entity] ?? 0,
+    }));
+    const ownValue =
+      discounted.regularValue +
+      discountedIndividualConsumers.reduce((sum, consumer) => sum + consumer.value, 0);
+    const benefit = ownValue + discounted.exportValue;
     return {
       selfConsumption: own,
+      regularSelfConsumption,
+      individualConsumers: discountedIndividualConsumers,
+      individualConsumptionExceedsTotal,
       exported: exportEnergy,
-      ownValue: discounted.ownValue,
+      ownValue,
       exportValue: discounted.exportValue,
       benefit,
       progress: Math.min(100, (benefit / config.investment_cost) * 100),
@@ -556,6 +694,9 @@ export function calculatePayback(
       : linearDate;
   return {
     selfConsumption: own,
+    regularSelfConsumption,
+    individualConsumers: nominalIndividualConsumers,
+    individualConsumptionExceedsTotal,
     exported: exportEnergy,
     ownValue,
     exportValue,
@@ -574,6 +715,7 @@ export function calculateScenarioComparisons(
   location?: { latitude?: number; longitude?: number },
   historicalDays?: DailyEnergy[],
   comparisonDiscountRate = config.annual_discount_rate ?? 3,
+  individualConsumerReadings: Record<string, number> = {},
 ): ScenarioCalculations {
   const base = {
     ...config,
@@ -588,6 +730,7 @@ export function calculateScenarioComparisons(
       now,
       location,
       historicalDays,
+      individualConsumerReadings,
     ),
     seasonal: calculatePayback(
       { ...base, use_location_seasonality: true, annual_discount_rate: 0 },
@@ -596,6 +739,7 @@ export function calculateScenarioComparisons(
       now,
       location,
       historicalDays,
+      individualConsumerReadings,
     ),
     discounted: calculatePayback(
       {
@@ -609,6 +753,7 @@ export function calculateScenarioComparisons(
       now,
       location,
       historicalDays,
+      individualConsumerReadings,
     ),
   };
 }
@@ -623,6 +768,7 @@ export function cacheKey(config: PVPaybackCardConfig, entity: string): string {
     config.self_consumption_baseline ?? 0,
     config.production_energy_baseline ?? 0,
     config.export_energy_baseline ?? 0,
+    config.individual_consumers ?? [],
   ]);
   return `pv-payback-card:last-valid:${scope}:${entity}`;
 }
@@ -759,6 +905,17 @@ export function validConfig(config: PVPaybackCardConfig): string | undefined {
   }
   if (!Number.isFinite(config.annual_discount_rate ?? 0) || (config.annual_discount_rate ?? 0) < 0)
     return "annual_discount_rate";
+  const individualEntities = new Set<string>();
+  for (const consumer of config.individual_consumers ?? []) {
+    if (!consumer.name?.trim()) return "individual_consumers.name";
+    if (!consumer.entity?.trim()) return "individual_consumers.entity";
+    if (individualEntities.has(consumer.entity)) return "individual_consumers.entity";
+    individualEntities.add(consumer.entity);
+    if (!Number.isFinite(consumer.value_per_kwh) || consumer.value_per_kwh < 0)
+      return "individual_consumers.value_per_kwh";
+    if (consumer.baseline !== undefined && !Number.isFinite(consumer.baseline))
+      return "individual_consumers.baseline";
+  }
   if (
     !config.export_energy_entity ||
     (!config.self_consumption_entity && !config.production_energy_entity)
@@ -791,5 +948,23 @@ export function assertConfigStructure(config: unknown): asserts config is PVPayb
     throw new Error(
       "Invalid configuration: self_consumption_entity or production_energy_entity is required.",
     );
+  }
+  if (candidate.individual_consumers !== undefined) {
+    if (!Array.isArray(candidate.individual_consumers)) {
+      throw new Error("Invalid configuration: individual_consumers must be an array.");
+    }
+    for (const consumer of candidate.individual_consumers) {
+      if (
+        !consumer ||
+        typeof consumer !== "object" ||
+        typeof consumer.name !== "string" ||
+        typeof consumer.entity !== "string" ||
+        typeof consumer.value_per_kwh !== "number" ||
+        (consumer.baseline !== undefined && typeof consumer.baseline !== "number") ||
+        (consumer.icon !== undefined && typeof consumer.icon !== "string")
+      ) {
+        throw new Error("Invalid configuration: malformed individual consumer.");
+      }
+    }
   }
 }

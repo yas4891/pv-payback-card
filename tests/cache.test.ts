@@ -82,6 +82,38 @@ describe("historical daily statistics", () => {
     expect(derived).toEqual([{ date: "2026-01-02", selfConsumption: 3, exported: 2 }]);
   });
 
+  it("includes individual consumer deltas", () => {
+    const result = dailyEnergyFromStatistics(
+      {
+        ...config,
+        individual_consumers: [{ name: "Miner", entity: "sensor.miner", value_per_kwh: 0.05 }],
+      },
+      {
+        "sensor.own": [
+          { start: "2026-01-01T00:00:00", sum: 10 },
+          { start: "2026-01-02T00:00:00", sum: 15 },
+        ],
+        "sensor.export": [
+          { start: "2026-01-01T00:00:00", sum: 2 },
+          { start: "2026-01-02T00:00:00", sum: 3 },
+        ],
+        "sensor.miner": [
+          { start: "2026-01-01T00:00:00", sum: 4 },
+          { start: "2026-01-02T00:00:00", sum: 6 },
+        ],
+      },
+    );
+
+    expect(result).toEqual([
+      {
+        date: "2026-01-02",
+        selfConsumption: 5,
+        exported: 1,
+        individualConsumers: { "sensor.miner": 2 },
+      },
+    ]);
+  });
+
   it("deduplicates WebSocket requests and retains the fallback after failure", async () => {
     const successConfig = {
       ...config,

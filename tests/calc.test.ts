@@ -86,6 +86,61 @@ describe("calculatePayback", () => {
     expect(result.paybackDate?.toISOString().slice(0, 10)).toBe("2026-10-22");
   });
 
+  it("values individual PV consumers separately without double counting", () => {
+    const result = calculatePayback(
+      {
+        ...config,
+        individual_consumers: [
+          {
+            name: "Bitcoin miner",
+            entity: "sensor.miner_pv_energy",
+            value_per_kwh: 0.05,
+            baseline: 100,
+          },
+          {
+            name: "Wallbox",
+            entity: "sensor.wallbox_pv_energy",
+            value_per_kwh: 0.13,
+          },
+        ],
+      },
+      10_000,
+      0,
+      new Date("2026-01-11T00:00:00"),
+      undefined,
+      undefined,
+      { "sensor.miner_pv_energy": 2_100, "sensor.wallbox_pv_energy": 1_000 },
+    );
+
+    expect(result.regularSelfConsumption).toBe(7_000);
+    expect(result.individualConsumers.map(({ energy, value }) => ({ energy, value }))).toEqual([
+      { energy: 2_000, value: 100 },
+      { energy: 1_000, value: 130 },
+    ]);
+    expect(result.ownValue).toBe(2_330);
+    expect(result.individualConsumptionExceedsTotal).toBe(false);
+  });
+
+  it("reports individual consumption above total PV self-consumption", () => {
+    const result = calculatePayback(
+      {
+        ...config,
+        individual_consumers: [
+          { name: "Wallbox", entity: "sensor.wallbox_pv_energy", value_per_kwh: 0.13 },
+        ],
+      },
+      500,
+      0,
+      new Date("2026-01-11T00:00:00"),
+      undefined,
+      undefined,
+      { "sensor.wallbox_pv_energy": 600 },
+    );
+
+    expect(result.regularSelfConsumption).toBe(0);
+    expect(result.individualConsumptionExceedsTotal).toBe(true);
+  });
+
   it("always avoids negative contribution after a counter reset", () => {
     const result = calculatePayback(
       { ...config, self_consumption_baseline: 100, export_energy_baseline: 50 },

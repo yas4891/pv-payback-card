@@ -243,4 +243,26 @@ describe("configuration editor", () => {
 
     expect("investment_cost" in changes[0]).toBe(false);
   });
+
+  it("adds and removes individual PV consumers", async () => {
+    const editor = await createEditor();
+    const changes: Partial<PVPaybackCardConfig>[] = [];
+    editor.addEventListener("config-changed", (event) => {
+      changes.push((event as CustomEvent<{ config: Partial<PVPaybackCardConfig> }>).detail.config);
+    });
+    editor.setConfig(config);
+    await editor.updateComplete;
+
+    (editor.shadowRoot?.querySelector(".add-consumer") as HTMLButtonElement).click();
+    await editor.updateComplete;
+
+    expect(changes.at(-1)?.individual_consumers).toEqual([
+      { name: "", entity: "", value_per_kwh: 0, baseline: 0 },
+    ]);
+    expect(editor.shadowRoot?.querySelector(".individual-consumers fieldset")).not.toBeNull();
+
+    (editor.shadowRoot?.querySelector(".remove-consumer") as HTMLButtonElement).click();
+    await editor.updateComplete;
+    expect(changes.at(-1)?.individual_consumers).toBeUndefined();
+  });
 });

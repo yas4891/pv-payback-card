@@ -31,4 +31,22 @@ describe("configuration validation", () => {
       }),
     ).toThrow("self_consumption_entity or production_energy_entity is required");
   });
+
+  it("validates individual consumer fields and duplicate entities", () => {
+    expect(
+      validConfig({
+        ...config,
+        individual_consumers: [
+          { name: "Miner", entity: "sensor.consumer", value_per_kwh: 0.05 },
+          { name: "Wallbox", entity: "sensor.consumer", value_per_kwh: 0.13 },
+        ],
+      }),
+    ).toBe("individual_consumers.entity");
+    expect(
+      validConfig({
+        ...config,
+        individual_consumers: [{ name: "Miner", entity: "sensor.miner", value_per_kwh: -0.01 }],
+      }),
+    ).toBe("individual_consumers.value_per_kwh");
+  });
 });

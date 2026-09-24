@@ -138,6 +138,7 @@ export class PVPaybackCard extends LitElement {
     const entities = [
       config.self_consumption_entity ?? config.production_energy_entity,
       config.export_energy_entity,
+      ...(config.individual_consumers ?? []).map((consumer) => consumer.entity),
     ].filter((entityId): entityId is string => Boolean(entityId));
     return entities.some((entityId) => {
       const before = previousHass.states[entityId];
@@ -225,11 +226,11 @@ export class PVPaybackCard extends LitElement {
 
   private recoverMissingEnergyFromHistory(config: PVPaybackCardConfig): void {
     if (!this.hass?.callWS) return;
-    const entityIds = config.self_consumption_entity
-      ? [config.self_consumption_entity, config.export_energy_entity]
-      : [config.production_energy_entity, config.export_energy_entity].filter(
-          (entityId): entityId is string => Boolean(entityId),
-        );
+    const entityIds = [
+      config.self_consumption_entity ?? config.production_energy_entity,
+      config.export_energy_entity,
+      ...(config.individual_consumers ?? []).map((consumer) => consumer.entity),
+    ].filter((entityId): entityId is string => Boolean(entityId));
     const missing: Record<string, Unit> = {};
     for (const entityId of entityIds) {
       const state = this.hass.states[entityId];
@@ -268,10 +269,14 @@ export class PVPaybackCard extends LitElement {
       Number(config.show_breakdown && (config.show_energy_values || config.show_money_values)) +
       Number(config.show_payback_date);
     const contributionLabelRows = Number(config.show_progress && config.show_contribution_segments);
+    const individualRows =
+      config.show_breakdown && (config.show_energy_values || config.show_money_values)
+        ? Math.ceil((config.individual_consumers?.length ?? 0) / 2)
+        : 0;
     if (config.display_style === "compact") {
-      return (visibleBlocks > 1 ? 2 : 1) + contributionLabelRows;
+      return (visibleBlocks > 1 ? 2 : 1) + contributionLabelRows + individualRows;
     }
-    return Math.max(1, 1 + visibleBlocks + contributionLabelRows);
+    return Math.max(1, 1 + visibleBlocks + contributionLabelRows + individualRows);
   }
 
   getGridOptions(): { columns: number; rows: number; min_columns: number; min_rows: number } {
@@ -361,13 +366,14 @@ export class PVPaybackCard extends LitElement {
       : "—";
   }
 
-  private formatPaybackDate(date: Date | undefined, now: Date): string {
-    if (this._config?.payback_date_format !== "relative") return this.formatDate(date);
+  private formatRelativePaybackDate(
+    date: Date | undefined,
+    reference: Date,
+    fromStartDate: boolean,
+  ): string {
     if (!date) return "—";
 
     const t = this.text();
-    const fromStartDate = this._config.payback_date_relative_reference === "start_date";
-    const reference = fromStartDate ? new Date(`${this._config.start_date}T00:00:00`) : now;
     const targetDay = calendarDay(date);
     const referenceDay = calendarDay(reference);
     if (targetDay.getTime() < referenceDay.getTime()) {
@@ -383,6 +389,13 @@ export class PVPaybackCard extends LitElement {
     if (months) parts.push(`${months} ${months === 1 ? t.relativeMonth : t.relativeMonths}`);
     if (days) parts.push(`${days} ${days === 1 ? t.relativeDay : t.relativeDays}`);
     return `${fromStartDate ? t.relativeAfter : t.relativeIn} ${parts.join(", ")}`;
+  }
+
+  private formatPaybackDate(date: Date | undefined, now: Date): string {
+    if (this._config?.payback_date_format !== "relative") return this.formatDate(date);
+    const fromStartDate = this._config.payback_date_relative_reference === "start_date";
+    const reference = fromStartDate ? new Date(`${this._config.start_date}T00:00:00`) : now;
+    return this.formatRelativePaybackDate(date, reference, fromStartDate);
   }
 
   private formatPercentage(value: number): string {
@@ -473,12 +486,28 @@ export class PVPaybackCard extends LitElement {
                   : nothing
               }
               <div class="scenario-values">
-                <div>
+                <div class="scenario-benefit">
                   <span>${t.benefit}</span><strong>${this.formatMoney(scenario.benefit, 2)}</strong>
                 </div>
-                <div>
+                <div class="scenario-payback-date">
                   <span>${t.expected}</span
-                  ><strong>${this.formatPaybackDate(scenario.paybackDate, now)}</strong>
+                  ><strong>${this.formatDate(scenario.paybackDate)}</strong>
+                </div>
+                <div class="scenario-payback-remaining">
+                  <span>${t.remainingPayback}</span
+                  ><strong
+                    >${this.formatRelativePaybackDate(scenario.paybackDate, now, false)}</strong
+                  >
+                </div>
+                <div class="scenario-payback-duration">
+                  <span>${t.paybackDuration}</span
+                  ><strong
+                    >${this.formatRelativePaybackDate(
+                      scenario.paybackDate,
+                      new Date(`${this._config!.start_date}T00:00:00`),
+                      true,
+                    )}</strong
+                  >
                 </div>
               </div>
             </section>`,
@@ -571,9 +600,16 @@ export class PVPaybackCard extends LitElement {
         ? this.readEnergy(config, config.production_energy_entity, t)
         : undefined;
     const exported = this.readEnergy(config, config.export_energy_entity, t);
-    const sourceReadings = [self, production, exported].filter((reading): reading is EnergyRead =>
-      Boolean(reading),
-    );
+    const individualReadings = (config.individual_consumers ?? []).map((consumer) => ({
+      consumer,
+      reading: this.readEnergy(config, consumer.entity, t),
+    }));
+    const sourceReadings = [
+      self,
+      production,
+      exported,
+      ...individualReadings.map(({ reading }) => reading),
+    ].filter((reading): reading is EnergyRead => Boolean(reading));
     let warningReadings = this.persistentWarningReadings(sourceReadings);
     const selfValue = self?.value;
     const productionValue = production?.value;
@@ -581,7 +617,8 @@ export class PVPaybackCard extends LitElement {
     if (
       exportedValue === undefined ||
       (self !== undefined && selfValue === undefined) ||
-      (production !== undefined && productionValue === undefined)
+      (production !== undefined && productionValue === undefined) ||
+      individualReadings.some(({ reading }) => reading.value === undefined)
     ) {
       const warning =
         warningReadings.length > 0
@@ -593,6 +630,9 @@ export class PVPaybackCard extends LitElement {
       return this.renderStatusCard(warning);
     }
     const selfConsumptionOrProduction = selfValue ?? productionValue!;
+    const individualConsumerValues = Object.fromEntries(
+      individualReadings.map(({ consumer, reading }) => [consumer.entity, reading.value!]),
+    );
     const now = new Date();
     const location = {
       latitude: this.hass?.config?.latitude,
@@ -605,6 +645,7 @@ export class PVPaybackCard extends LitElement {
       config,
       selfConsumptionOrProduction,
       exportedValue,
+      individualConsumerValues,
       dateKey(now),
       location,
       historicalState,
@@ -619,6 +660,7 @@ export class PVPaybackCard extends LitElement {
           now,
           location,
           dailyEnergyFromStatistics(config, this._historicalStatistics),
+          individualConsumerValues,
         ),
       };
     }
@@ -649,6 +691,7 @@ export class PVPaybackCard extends LitElement {
             location,
             dailyEnergyFromStatistics(config, this._historicalStatistics),
             this._comparisonDiscountRate,
+            individualConsumerValues,
           ),
         };
       }
@@ -681,7 +724,10 @@ export class PVPaybackCard extends LitElement {
     )
       ? t.noProjection
       : undefined;
-    const cardWarning = [cacheWarning, projectionWarning]
+    const plausibilityWarning = calc.individualConsumptionExceedsTotal
+      ? t.individualConsumersExceedSelfConsumption
+      : undefined;
+    const cardWarning = [cacheWarning, plausibilityWarning, projectionWarning]
       .filter((message): message is string => Boolean(message))
       .join("\n");
     const ownContribution = Math.min(
@@ -694,6 +740,13 @@ export class PVPaybackCard extends LitElement {
     );
     const ownShare = calc.benefit > 0 ? (calc.ownValue / calc.benefit) * 100 : 0;
     const exportShare = calc.benefit > 0 ? (calc.exportValue / calc.benefit) * 100 : 0;
+    const individualValue = calc.individualConsumers.reduce(
+      (sum, consumer) => sum + consumer.value,
+      0,
+    );
+    const regularOwnValue = Math.max(0, calc.ownValue - individualValue);
+    const regularOwnShare = calc.benefit > 0 ? (regularOwnValue / calc.benefit) * 100 : 0;
+    const ownLabel = calc.individualConsumers.length > 0 ? t.regularOwn : t.own;
     const compact = config.display_style === "compact";
     return html`<ha-card>
         <div class=${`content ${compact ? "compact" : "full"}`}>
@@ -772,12 +825,24 @@ export class PVPaybackCard extends LitElement {
                   }
                   <span id="contribution-tooltip" class="progress-tooltip" role="tooltip">
                     <span class="tooltip-row tooltip-own">
-                      <span>${t.own}</span>
+                      <span>${ownLabel}</span>
                       <strong
-                        >${this.formatPercentage(ownShare)} ·
-                        ${this.formatMoney(calc.ownValue)}</strong
+                        >${this.formatPercentage(regularOwnShare)} ·
+                        ${this.formatMoney(regularOwnValue)}</strong
                       >
                     </span>
+                    ${calc.individualConsumers.map(
+                      (consumer) =>
+                        html`<span class="tooltip-row tooltip-individual">
+                          <span>${consumer.name}</span>
+                          <strong
+                            >${this.formatPercentage(
+                              calc.benefit > 0 ? (consumer.value / calc.benefit) * 100 : 0,
+                            )}
+                            · ${this.formatMoney(consumer.value)}</strong
+                          >
+                        </span>`,
+                    )}
                     <span class="tooltip-row tooltip-export">
                       <span>${t.export}</span>
                       <strong
@@ -798,23 +863,50 @@ export class PVPaybackCard extends LitElement {
                     class="own breakdown-action"
                     type="button"
                     ?disabled=${!config.self_consumption_entity}
-                    aria-label=${t.own}
-                    title=${compact ? t.own : nothing}
+                    aria-label=${ownLabel}
+                    title=${compact ? ownLabel : nothing}
                     @click=${() =>
                       config.self_consumption_entity &&
                       this.openMoreInfo(config.self_consumption_entity)}
                   >
-                    <span>${t.own}</span
+                    <span>${ownLabel}</span
                     ><b
                       >${
                         config.show_energy_values && config.show_money_values
-                          ? `${this.formatEnergy(calc.selfConsumption)} · ${this.formatMoney(calc.ownValue)}`
+                          ? `${this.formatEnergy(calc.regularSelfConsumption)} · ${this.formatMoney(regularOwnValue)}`
                           : config.show_energy_values
-                            ? this.formatEnergy(calc.selfConsumption)
-                            : this.formatMoney(calc.ownValue)
+                            ? this.formatEnergy(calc.regularSelfConsumption)
+                            : this.formatMoney(regularOwnValue)
                       }</b
                     >
                   </button>
+                  ${calc.individualConsumers.map(
+                    (consumer) =>
+                      html`<button
+                        class="individual breakdown-action"
+                        type="button"
+                        aria-label=${consumer.name}
+                        title=${compact ? consumer.name : nothing}
+                        @click=${() => this.openMoreInfo(consumer.entity)}
+                      >
+                        <span class="breakdown-label"
+                          >${
+                            consumer.icon
+                              ? html`<ha-icon .icon=${consumer.icon}></ha-icon>`
+                              : nothing
+                          }${consumer.name}</span
+                        >
+                        <b
+                          >${
+                            config.show_energy_values && config.show_money_values
+                              ? `${this.formatEnergy(consumer.energy)} · ${this.formatMoney(consumer.value)}`
+                              : config.show_energy_values
+                                ? this.formatEnergy(consumer.energy)
+                                : this.formatMoney(consumer.value)
+                          }</b
+                        >
+                      </button>`,
+                  )}
                   <button
                     class="export breakdown-action"
                     type="button"

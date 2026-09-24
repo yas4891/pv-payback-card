@@ -1,6 +1,6 @@
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import type { HomeAssistant } from "./card";
-import type { PVPaybackCardConfig } from "./calc";
+import type { IndividualConsumerConfig, PVPaybackCardConfig } from "./calc";
 import { editorTranslations } from "./i18n";
 import { editorStyles } from "./styles";
 
@@ -44,6 +44,17 @@ export class PVPaybackCardEditor extends LitElement {
     this._advancedOpen = !this._advancedOpen;
   }
 
+  private emitConfig(config: Partial<PVPaybackCardConfig>): void {
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   private changed(event: Event): void {
     const target = event.target as HTMLInputElement;
     const numeric = [
@@ -70,14 +81,7 @@ export class PVPaybackCardEditor extends LitElement {
     } else {
       config[target.name as keyof PVPaybackCardConfig] = target.value as never;
     }
-    this._config = config;
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: this._config },
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this.emitConfig(config);
   }
 
   private entityChanged(
@@ -89,14 +93,74 @@ export class PVPaybackCardEditor extends LitElement {
     const config = { ...this._config };
     if (value) config[name] = value;
     else delete config[name];
-    this._config = config;
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: this._config },
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this.emitConfig(config);
+  }
+
+  private addIndividualConsumer(): void {
+    const consumers = [...(this._config.individual_consumers ?? [])];
+    consumers.push({ name: "", entity: "", value_per_kwh: 0, baseline: 0 });
+    this.emitConfig({ ...this._config, individual_consumers: consumers });
+  }
+
+  private removeIndividualConsumer(index: number): void {
+    const consumers = [...(this._config.individual_consumers ?? [])];
+    consumers.splice(index, 1);
+    const config = { ...this._config };
+    if (consumers.length > 0) config.individual_consumers = consumers;
+    else delete config.individual_consumers;
+    this.emitConfig(config);
+  }
+
+  private changeIndividualConsumer(
+    index: number,
+    key: keyof IndividualConsumerConfig,
+    rawValue: unknown,
+  ): void {
+    const consumers = (this._config.individual_consumers ?? []).map((consumer) => ({
+      ...consumer,
+    }));
+    const consumer = consumers[index];
+    if (!consumer) return;
+    if (key === "value_per_kwh" || key === "baseline") {
+      const text = String(rawValue ?? "").trim();
+      if (!text && key === "baseline") delete consumer.baseline;
+      else {
+        const value = Number(text);
+        if (!Number.isFinite(value)) return;
+        consumer[key] = value;
+      }
+    } else {
+      const value = String(rawValue ?? "").trim();
+      if (!value && key === "icon") delete consumer.icon;
+      else consumer[key] = value;
+    }
+    this.emitConfig({ ...this._config, individual_consumers: consumers });
+  }
+
+  private individualConsumerEntityField(
+    consumer: IndividualConsumerConfig,
+    index: number,
+    label: string,
+  ): TemplateResult {
+    const pickerAvailable = Boolean(this.hass && customElements.get("ha-entity-picker"));
+    if (pickerAvailable) {
+      return html`<ha-entity-picker
+        .hass=${this.hass}
+        .value=${consumer.entity}
+        .label=${label}
+        .includeDomains=${["sensor"]}
+        .allowCustomEntity=${true}
+        @value-changed=${(event: CustomEvent<{ value?: unknown }>) =>
+          this.changeIndividualConsumer(index, "entity", event.detail?.value)}
+      ></ha-entity-picker>`;
+    }
+    return html`<label
+      >${label}<input
+        type="text"
+        .value=${consumer.entity}
+        @change=${(event: Event) =>
+          this.changeIndividualConsumer(index, "entity", (event.target as HTMLInputElement).value)}
+    /></label>`;
   }
 
   private entityField(
@@ -179,7 +243,80 @@ export class PVPaybackCardEditor extends LitElement {
         textField,
       )}${this.entityField("production_energy_entity", text.production_energy_entity)}${this.entityField("export_energy_entity", text.export_energy_entity)}${standardBaselineFields.map(
         textField,
-      )}<label
+      )}
+      <section class="individual-consumers">
+        <h3>${text.individual_consumers}</h3>
+        <p>${text.individual_consumers_description}</p>
+        ${(this._config.individual_consumers ?? []).map(
+          (consumer, index) =>
+            html`<fieldset>
+              <legend>${consumer.name || `${text.individual_consumers} ${index + 1}`}</legend>
+              <label
+                >${text.individual_consumer_name}<input
+                  type="text"
+                  .value=${consumer.name}
+                  @change=${(event: Event) =>
+                    this.changeIndividualConsumer(
+                      index,
+                      "name",
+                      (event.target as HTMLInputElement).value,
+                    )}
+              /></label>
+              ${this.individualConsumerEntityField(
+                consumer,
+                index,
+                text.individual_consumer_entity,
+              )}
+              <label
+                >${text.individual_consumer_value}<input
+                  type="number"
+                  min="0"
+                  step="any"
+                  .value=${String(consumer.value_per_kwh)}
+                  @change=${(event: Event) =>
+                    this.changeIndividualConsumer(
+                      index,
+                      "value_per_kwh",
+                      (event.target as HTMLInputElement).value,
+                    )}
+              /></label>
+              <label
+                >${text.individual_consumer_baseline}<input
+                  type="number"
+                  step="any"
+                  .value=${String(consumer.baseline ?? "")}
+                  @change=${(event: Event) =>
+                    this.changeIndividualConsumer(
+                      index,
+                      "baseline",
+                      (event.target as HTMLInputElement).value,
+                    )}
+              /></label>
+              <label
+                >${text.individual_consumer_icon}<input
+                  type="text"
+                  .value=${consumer.icon ?? ""}
+                  @change=${(event: Event) =>
+                    this.changeIndividualConsumer(
+                      index,
+                      "icon",
+                      (event.target as HTMLInputElement).value,
+                    )}
+              /></label>
+              <button
+                type="button"
+                class="remove-consumer"
+                @click=${() => this.removeIndividualConsumer(index)}
+              >
+                ${text.individual_consumer_remove}
+              </button>
+            </fieldset>`,
+        )}
+        <button type="button" class="add-consumer" @click=${this.addIndividualConsumer}>
+          ${text.individual_consumer_add}
+        </button>
+      </section>
+      <label
         >${text.display_style}<select
           name="display_style"
           .value=${this._config.display_style ?? "full"}

@@ -215,6 +215,9 @@ describe("scenario dialog", () => {
     expect(dialog.textContent).toContain("With seasonality");
     expect(dialog.textContent).toContain("With seasonality and discounting");
     expect(dialog.textContent).toContain("Discount rate: 5%");
+    expect(dialog.textContent).toContain("Estimated payback");
+    expect(dialog.textContent).toContain("Remaining from today");
+    expect(dialog.textContent).toContain("Duration from start date");
     const scenarios = Array.from(dialog.querySelectorAll(".scenario"));
     expect(scenarios.map((scenario) => scenario.className)).toEqual([
       "scenario scenario-linear",
@@ -347,10 +350,20 @@ describe("relative payback date", () => {
     (card.shadowRoot?.querySelector(".date .scenario-trigger") as HTMLButtonElement).click();
     await card.updateComplete;
     const dates = Array.from(
-      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-values div:last-child strong") ?? [],
+      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-payback-date strong") ?? [],
+    ).map((element) => element.textContent?.trim());
+    const remaining = Array.from(
+      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-payback-remaining strong") ?? [],
+    ).map((element) => element.textContent?.trim());
+    const durations = Array.from(
+      card.shadowRoot?.querySelectorAll("ha-dialog .scenario-payback-duration strong") ?? [],
     ).map((element) => element.textContent?.trim());
     expect(dates).toHaveLength(3);
-    expect(dates.every((value) => value?.startsWith("in "))).toBe(true);
+    expect(dates.every((value) => value && !value.startsWith("in "))).toBe(true);
+    expect(remaining).toHaveLength(3);
+    expect(remaining.every((value) => value?.startsWith("in "))).toBe(true);
+    expect(durations).toHaveLength(3);
+    expect(durations.every((value) => value?.startsWith("after "))).toBe(true);
   });
 
   it("shows days, today, and overdue without rounding them to a month", () => {

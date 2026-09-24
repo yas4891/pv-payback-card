@@ -27,6 +27,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 - Payback forecast from the observed average financial benefit since the start date.
 - Optional location-aware seasonal forecast, calculated locally from the Home Assistant location.
 - Optional baseline values for counters that started before the accounting period.
+- Individual PV-only consumers with custom per-kWh values, baselines, and icons.
 - Optional energy and monetary values in the detailed breakdown.
 - Progress tooltip with self-consumption and export contributions shown as percentages and money.
 - Optional blue and green contribution segments with permanent percentage labels and clickable source-entity details.
@@ -38,7 +39,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 
 ### Scenario comparison
 
-Click the displayed benefit or estimated payback date to open the scenario comparison. The dialog always shows a linear forecast, a seasonal forecast, and a seasonal forecast using `annual_discount_rate`. When `annual_discount_rate` is not configured, only the comparison dialog uses a clearly marked default rate of 3%. The main card remains nominal until the parameter is configured. These comparisons remain available when the corresponding display options are disabled. Without a valid Home Assistant location, the seasonal rows transparently fall back to the linear forecast.
+Click the displayed benefit or estimated payback date to open the scenario comparison. The dialog always shows a linear forecast, a seasonal forecast, and a seasonal forecast using `annual_discount_rate`. Every scenario includes the calendar date, remaining time from today, and total duration from the accounting start. When `annual_discount_rate` is not configured, only the comparison dialog uses a clearly marked default rate of 3%. The main card remains nominal until the parameter is configured. These comparisons remain available when the corresponding display options are disabled. Without a valid Home Assistant location, the seasonal rows transparently fall back to the linear forecast.
 
 ## Installation
 
@@ -99,6 +100,26 @@ Use `production_energy_entity` and `export_energy_entity` for most installations
 
 Alternatively, configure `self_consumption_entity` and `export_energy_entity`. A configured direct self-consumption entity always takes priority over the production-based calculation.
 
+### Individual consumers with custom values
+
+Use `individual_consumers` to value selected parts of PV self-consumption differently. Each sensor must already contain only the PV energy assigned to that consumer. Remove grid energy beforehand with a Home Assistant helper or template.
+
+```yaml
+individual_consumers:
+  - name: Bitcoin miner
+    entity: sensor.bitcoin_miner_pv_energy_total
+    value_per_kwh: 0.05
+    baseline: 1200
+    icon: mdi:pickaxe
+  - name: Wallbox
+    entity: sensor.wallbox_external_cars_pv_energy_total
+    value_per_kwh: 0.13
+    baseline: 350
+    icon: mdi:ev-station
+```
+
+The card subtracts these values from regular self-consumption. It then values every individual consumer with its configured `value_per_kwh`. The sensors must expose cumulative energy in `Wh`, `kWh`, or `MWh`. Power sensors are not supported.
+
 ### Combining several energy sources
 
 See [Combining production from multiple inverters](https://github.com/yas4891/pv-payback-card/wiki/Combining-production-from-multiple-inverters) for a generic Template helper workflow and a concrete two-inverter example.
@@ -125,6 +146,7 @@ These options cover the normal production-based setup, pricing, card identity, a
 | `locale`                     | No       | Home Assistant language   | Language and number format override. Example: `de-DE` or `en-US`. German and English card texts are included.                                                                                                                                                                                    |
 | `display_style`              | No       | `full`                    | Selects the card layout. Use `full` for visible labels or `compact` for a shorter two-row value layout with localized tooltips. Example: `compact`.                                                                                                                                              |
 | `show_contribution_segments` | No       | `false`                   | Shows self-consumption as a blue segment and export as a green segment in the progress bar. The corresponding breakdown values use the same colors and open source details when clicked.                                                                                                         |
+| `individual_consumers`       | No       | `[]`                      | List of PV-only consumer energy sensors with custom values. Each entry requires `name`, `entity`, and `value_per_kwh`. Optional `baseline` and `icon` values configure the accounting start and display. Grid energy must already be removed.                                                    |
 
 ### Advanced settings
 
@@ -147,7 +169,7 @@ These options provide a direct self-consumption input, detailed visibility contr
 
 ## Calculation and data availability
 
-The card calculates the benefit as self-consumed energy times `electricity_price`, plus exported energy times `feed_in_tariff`. With production input, self-consumed energy equals production since the baseline minus export since the baseline. The editor shows the baseline that matches the selected input model. It projects the payback date from the average benefit since `start_date`.
+The card calculates regular self-consumption after subtracting all configured individual consumers. It values regular self-consumption with `electricity_price`, each individual consumer with `value_per_kwh`, and export with `feed_in_tariff`. With production input, total self-consumption equals production since the baseline minus export since the baseline. The editor shows the baseline that matches the selected input model. It projects the payback date from the average benefit since `start_date`.
 
 See [Seasonality and discounting](https://github.com/yas4891/pv-payback-card/wiki/Seasonality-and-discounting) for configuration, calculation details, recorder usage, and limitations.
 
