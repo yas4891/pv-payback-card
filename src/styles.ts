@@ -432,12 +432,17 @@ export const cardStyles = css`
     max-width: 520px;
     white-space: pre-wrap;
   }
+  ha-dialog.scenario-dialog-host {
+    --mdc-dialog-min-width: min(1100px, calc(100vw - 48px));
+    --mdc-dialog-max-width: min(1280px, calc(100vw - 48px));
+  }
   .scenario-dialog {
+    box-sizing: border-box;
     display: grid;
-    width: min(920px, calc(100vw - 48px));
-    max-width: 100%;
+    width: 100%;
+    max-width: none;
     gap: 12px;
-    min-width: min(760px, calc(100vw - 48px));
+    min-width: 0;
     padding-bottom: 8px;
   }
   .scenario {
@@ -500,6 +505,10 @@ export const cardStyles = css`
     text-align: end;
   }
   @media (max-width: 520px) {
+    ha-dialog.scenario-dialog-host {
+      --mdc-dialog-min-width: calc(100vw - 24px);
+      --mdc-dialog-max-width: calc(100vw - 24px);
+    }
     .scenario-dialog {
       width: auto;
       min-width: 0;

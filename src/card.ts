@@ -458,6 +458,7 @@ export class PVPaybackCard extends LitElement {
       rows.some(({ scenario }) => !scenario.paybackDate) ? t.noProjection : undefined,
     ].filter((message) => message !== undefined);
     return html`<ha-dialog
+      class="scenario-dialog-host"
       .open=${this._scenarioDialogOpen}
       .heading=${t.scenariosTitle}
       @closed=${this.closeScenarioDialog}

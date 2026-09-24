@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.7.1 - 2026-09-24
+
+- The scenario dialog now expands to show every payback value without clipping the final column.
+
 ## 0.7.0 - 2026-09-24
 
 - You can now assign custom per-kWh values to individual PV-only consumers without counting their energy twice.
