@@ -131,8 +131,7 @@ export class PVPaybackCardEditor extends LitElement {
       }
     } else {
       const value = String(rawValue ?? "").trim();
-      if (!value && key === "icon") delete consumer.icon;
-      else consumer[key] = value;
+      consumer[key] = value;
     }
     this.emitConfig({ ...this._config, individual_consumers: consumers });
   }
@@ -289,17 +288,6 @@ export class PVPaybackCardEditor extends LitElement {
                     this.changeIndividualConsumer(
                       index,
                       "baseline",
-                      (event.target as HTMLInputElement).value,
-                    )}
-              /></label>
-              <label
-                >${text.individual_consumer_icon}<input
-                  type="text"
-                  .value=${consumer.icon ?? ""}
-                  @change=${(event: Event) =>
-                    this.changeIndividualConsumer(
-                      index,
-                      "icon",
                       (event.target as HTMLInputElement).value,
                     )}
               /></label>

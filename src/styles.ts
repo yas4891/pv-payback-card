@@ -334,9 +334,6 @@ export const cardStyles = css`
   .tooltip-row.tooltip-export {
     color: var(--success-color, #4caf50);
   }
-  .tooltip-row.tooltip-individual {
-    color: var(--primary-text-color);
-  }
   .breakdown {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -368,16 +365,6 @@ export const cardStyles = css`
   .breakdown b {
     font-size: 0.92em;
   }
-  .breakdown-label {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .breakdown-label ha-icon {
-    width: 18px;
-    height: 18px;
-    color: inherit;
-  }
   .breakdown-action {
     padding: 0;
     border: 0;
@@ -394,6 +381,23 @@ export const cardStyles = css`
     outline: 2px solid var(--primary-color);
     outline-offset: 4px;
     border-radius: 4px;
+  }
+  .individual-consumers-link {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--primary-color);
+    font: inherit;
+    font-size: 0.78em;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .individual-consumers-link:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 3px;
+    border-radius: 2px;
   }
   .breakdown.contribution-segments .own,
   .breakdown.contribution-segments .own span,
@@ -431,6 +435,27 @@ export const cardStyles = css`
   .warning-dialog-message {
     max-width: 520px;
     white-space: pre-wrap;
+  }
+  .individual-consumers-dialog {
+    display: grid;
+    min-width: min(420px, calc(100vw - 48px));
+    gap: 2px;
+    margin: 0;
+    padding: 0 0 8px;
+    list-style: none;
+  }
+  .individual-consumer-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    min-height: 44px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--divider-color);
+    color: inherit;
+  }
+  .individual-consumer-row strong {
+    white-space: nowrap;
   }
   ha-dialog.scenario-dialog-host {
     --mdc-dialog-min-width: min(1100px, calc(100vw - 48px));

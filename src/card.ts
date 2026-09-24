@@ -51,18 +51,21 @@ export class PVPaybackCard extends LitElement {
     hass: { attribute: false },
     _config: { state: true },
     _scenarioDialogOpen: { state: true },
+    _individualConsumersDialogOpen: { state: true },
     _contributionTooltipOpen: { state: true },
     _warningDialogMessage: { state: true },
   };
   declare hass?: HomeAssistant;
   declare _config?: PVPaybackCardConfig;
   declare _scenarioDialogOpen: boolean;
+  declare _individualConsumersDialogOpen: boolean;
   declare _contributionTooltipOpen: boolean;
   declare _warningDialogMessage?: string;
 
   constructor() {
     super();
     this._scenarioDialogOpen = false;
+    this._individualConsumersDialogOpen = false;
     this._contributionTooltipOpen = false;
   }
 
@@ -94,6 +97,7 @@ export class PVPaybackCard extends LitElement {
     this._comparisonUsesDefaultRate = config.annual_discount_rate === undefined;
     this._config = withDisplayDefaults(config);
     this._contributionTooltipOpen = false;
+    this._individualConsumersDialogOpen = false;
     this._historicalStatistics = undefined;
     this._historicalStatisticsKey = undefined;
     this._historyRecoveryKey = undefined;
@@ -269,14 +273,10 @@ export class PVPaybackCard extends LitElement {
       Number(config.show_breakdown && (config.show_energy_values || config.show_money_values)) +
       Number(config.show_payback_date);
     const contributionLabelRows = Number(config.show_progress && config.show_contribution_segments);
-    const individualRows =
-      config.show_breakdown && (config.show_energy_values || config.show_money_values)
-        ? Math.ceil((config.individual_consumers?.length ?? 0) / 2)
-        : 0;
     if (config.display_style === "compact") {
-      return (visibleBlocks > 1 ? 2 : 1) + contributionLabelRows + individualRows;
+      return (visibleBlocks > 1 ? 2 : 1) + contributionLabelRows;
     }
-    return Math.max(1, 1 + visibleBlocks + contributionLabelRows + individualRows);
+    return Math.max(1, 1 + visibleBlocks + contributionLabelRows);
   }
 
   getGridOptions(): { columns: number; rows: number; min_columns: number; min_rows: number } {
@@ -411,6 +411,38 @@ export class PVPaybackCard extends LitElement {
 
   private closeScenarioDialog(): void {
     this._scenarioDialogOpen = false;
+  }
+
+  private openIndividualConsumersDialog(): void {
+    this._individualConsumersDialogOpen = true;
+  }
+
+  private closeIndividualConsumersDialog(): void {
+    this._individualConsumersDialogOpen = false;
+  }
+
+  private renderIndividualConsumersDialog(calculation: Calculation): TemplateResult {
+    const t = this.text();
+    return html`<ha-dialog
+      .open=${this._individualConsumersDialogOpen}
+      .heading=${t.individualConsumers}
+      @closed=${this.closeIndividualConsumersDialog}
+    >
+      <ul class="individual-consumers-dialog">
+        ${calculation.individualConsumers.map(
+          (consumer) =>
+            html`<li class="individual-consumer-row">
+              <span>${consumer.name}</span>
+              <strong
+                >${this.formatEnergy(consumer.energy)} · ${this.formatMoney(consumer.value)}</strong
+              >
+            </li>`,
+        )}
+      </ul>
+      <ha-button slot="primaryAction" @click=${this.closeIndividualConsumersDialog}
+        >${t.close}</ha-button
+      >
+    </ha-dialog>`;
   }
 
   private toggleContributionTooltip(): void {
@@ -741,13 +773,6 @@ export class PVPaybackCard extends LitElement {
     );
     const ownShare = calc.benefit > 0 ? (calc.ownValue / calc.benefit) * 100 : 0;
     const exportShare = calc.benefit > 0 ? (calc.exportValue / calc.benefit) * 100 : 0;
-    const individualValue = calc.individualConsumers.reduce(
-      (sum, consumer) => sum + consumer.value,
-      0,
-    );
-    const regularOwnValue = Math.max(0, calc.ownValue - individualValue);
-    const regularOwnShare = calc.benefit > 0 ? (regularOwnValue / calc.benefit) * 100 : 0;
-    const ownLabel = calc.individualConsumers.length > 0 ? t.regularOwn : t.own;
     const compact = config.display_style === "compact";
     return html`<ha-card>
         <div class=${`content ${compact ? "compact" : "full"}`}>
@@ -826,24 +851,12 @@ export class PVPaybackCard extends LitElement {
                   }
                   <span id="contribution-tooltip" class="progress-tooltip" role="tooltip">
                     <span class="tooltip-row tooltip-own">
-                      <span>${ownLabel}</span>
+                      <span>${t.own}</span>
                       <strong
-                        >${this.formatPercentage(regularOwnShare)} ·
-                        ${this.formatMoney(regularOwnValue)}</strong
+                        >${this.formatPercentage(ownShare)} ·
+                        ${this.formatMoney(calc.ownValue)}</strong
                       >
                     </span>
-                    ${calc.individualConsumers.map(
-                      (consumer) =>
-                        html`<span class="tooltip-row tooltip-individual">
-                          <span>${consumer.name}</span>
-                          <strong
-                            >${this.formatPercentage(
-                              calc.benefit > 0 ? (consumer.value / calc.benefit) * 100 : 0,
-                            )}
-                            · ${this.formatMoney(consumer.value)}</strong
-                          >
-                        </span>`,
-                    )}
                     <span class="tooltip-row tooltip-export">
                       <span>${t.export}</span>
                       <strong
@@ -860,54 +873,40 @@ export class PVPaybackCard extends LitElement {
               ? html`<div
                   class="breakdown ${config.show_contribution_segments ? "contribution-segments" : ""}"
                 >
-                  <button
-                    class="own breakdown-action"
-                    type="button"
-                    ?disabled=${!config.self_consumption_entity}
-                    aria-label=${ownLabel}
-                    title=${compact ? ownLabel : nothing}
-                    @click=${() =>
-                      config.self_consumption_entity &&
-                      this.openMoreInfo(config.self_consumption_entity)}
-                  >
-                    <span>${ownLabel}</span
-                    ><b
-                      >${
-                        config.show_energy_values && config.show_money_values
-                          ? `${this.formatEnergy(calc.regularSelfConsumption)} · ${this.formatMoney(regularOwnValue)}`
-                          : config.show_energy_values
-                            ? this.formatEnergy(calc.regularSelfConsumption)
-                            : this.formatMoney(regularOwnValue)
-                      }</b
+                  <div class="breakdown-group">
+                    <button
+                      class="own breakdown-action"
+                      type="button"
+                      ?disabled=${!config.self_consumption_entity}
+                      aria-label=${t.own}
+                      title=${compact ? t.own : nothing}
+                      @click=${() =>
+                        config.self_consumption_entity &&
+                        this.openMoreInfo(config.self_consumption_entity)}
                     >
-                  </button>
-                  ${calc.individualConsumers.map(
-                    (consumer) =>
-                      html`<button
-                        class="individual breakdown-action"
-                        type="button"
-                        aria-label=${consumer.name}
-                        title=${compact ? consumer.name : nothing}
-                        @click=${() => this.openMoreInfo(consumer.entity)}
+                      <span>${t.own}</span
+                      ><b
+                        >${
+                          config.show_energy_values && config.show_money_values
+                            ? `${this.formatEnergy(calc.selfConsumption)} · ${this.formatMoney(calc.ownValue)}`
+                            : config.show_energy_values
+                              ? this.formatEnergy(calc.selfConsumption)
+                              : this.formatMoney(calc.ownValue)
+                        }</b
                       >
-                        <span class="breakdown-label"
-                          >${
-                            consumer.icon
-                              ? html`<ha-icon .icon=${consumer.icon}></ha-icon>`
-                              : nothing
-                          }${consumer.name}</span
-                        >
-                        <b
-                          >${
-                            config.show_energy_values && config.show_money_values
-                              ? `${this.formatEnergy(consumer.energy)} · ${this.formatMoney(consumer.value)}`
-                              : config.show_energy_values
-                                ? this.formatEnergy(consumer.energy)
-                                : this.formatMoney(consumer.value)
-                          }</b
-                        >
-                      </button>`,
-                  )}
+                    </button>
+                    ${
+                      calc.individualConsumers.length > 0
+                        ? html`<button
+                            class="individual-consumers-link"
+                            type="button"
+                            @click=${this.openIndividualConsumersDialog}
+                          >
+                            ${t.individualConsumers}
+                          </button>`
+                        : nothing
+                    }
+                  </div>
                   <button
                     class="export breakdown-action"
                     type="button"
@@ -953,6 +952,11 @@ export class PVPaybackCard extends LitElement {
               validLocation(location.latitude, location.longitude),
               now,
             )
+          : nothing
+      }
+      ${
+        this._individualConsumersDialogOpen && calc.individualConsumers.length > 0
+          ? this.renderIndividualConsumersDialog(calc)
           : nothing
       }
       ${this.renderWarningDialog()}`;

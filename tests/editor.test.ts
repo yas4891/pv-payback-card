@@ -260,6 +260,7 @@ describe("configuration editor", () => {
       { name: "", entity: "", value_per_kwh: 0, baseline: 0 },
     ]);
     expect(editor.shadowRoot?.querySelector(".individual-consumers fieldset")).not.toBeNull();
+    expect(editor.shadowRoot?.textContent).not.toContain("Icon (optional)");
 
     (editor.shadowRoot?.querySelector(".remove-consumer") as HTMLButtonElement).click();
     await editor.updateComplete;

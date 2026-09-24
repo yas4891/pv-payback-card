@@ -7,7 +7,6 @@ export type IndividualConsumerConfig = {
   entity: string;
   value_per_kwh: number;
   baseline?: number;
-  icon?: string;
 };
 
 export type PVPaybackCardConfig = {
@@ -960,8 +959,7 @@ export function assertConfigStructure(config: unknown): asserts config is PVPayb
         typeof consumer.name !== "string" ||
         typeof consumer.entity !== "string" ||
         typeof consumer.value_per_kwh !== "number" ||
-        (consumer.baseline !== undefined && typeof consumer.baseline !== "number") ||
-        (consumer.icon !== undefined && typeof consumer.icon !== "string")
+        (consumer.baseline !== undefined && typeof consumer.baseline !== "number")
       ) {
         throw new Error("Invalid configuration: malformed individual consumer.");
       }

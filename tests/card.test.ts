@@ -49,6 +49,50 @@ describe("sections grid sizing", () => {
   });
 });
 
+describe("individual consumer details", () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it("keeps consumers off the card and opens them from a small link", async () => {
+    const card = document.createElement("pv-payback-card") as PVPaybackCard;
+    card.hass = {
+      states: {
+        "sensor.own": { state: "1000", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.export": { state: "0", attributes: { unit_of_measurement: "kWh" } },
+        "sensor.miner": { state: "100", attributes: { unit_of_measurement: "kWh" } },
+      },
+      locale: { language: "en" },
+      config: { currency: "EUR" },
+    };
+    card.setConfig({
+      ...config,
+      individual_consumers: [
+        { name: "Bitcoin miner", entity: "sensor.miner", value_per_kwh: 0.05 },
+      ],
+    });
+    document.body.append(card);
+    await card.updateComplete;
+
+    const breakdown = card.shadowRoot?.querySelector(".breakdown") as HTMLElement;
+    expect(breakdown.textContent).toContain("Self-consumption");
+    expect(breakdown.textContent).not.toContain("Regular self-consumption");
+    expect(breakdown.textContent).not.toContain("Bitcoin miner");
+
+    (breakdown.querySelector(".individual-consumers-link") as HTMLButtonElement).click();
+    await card.updateComplete;
+
+    const dialog = card.shadowRoot?.querySelector("ha-dialog") as HTMLElement & {
+      heading?: string;
+    };
+    expect(dialog.heading).toBe("Individual consumers");
+    expect(dialog.textContent).toContain("Bitcoin miner");
+    expect(dialog.textContent).toContain("100 kWh");
+    expect(dialog.querySelector(".individual-consumer-row")?.tagName).toBe("LI");
+    expect(dialog.querySelector(".individual-consumer-row button")).toBeNull();
+  });
+});
+
 describe("persistent warning delay", () => {
   afterEach(() => {
     vi.useRealTimers();

@@ -27,7 +27,7 @@ The card accepts `Wh`, `kWh`, and `MWh` sensors. It preserves the latest valid r
 - Payback forecast from the observed average financial benefit since the start date.
 - Optional location-aware seasonal forecast, calculated locally from the Home Assistant location.
 - Optional baseline values for counters that started before the accounting period.
-- Individual PV-only consumers with custom per-kWh values, baselines, and icons.
+- Individual PV-only consumers with custom per-kWh values and baselines.
 - Optional energy and monetary values in the detailed breakdown.
 - Progress tooltip with self-consumption and export contributions shown as percentages and money.
 - Optional blue and green contribution segments with permanent percentage labels and clickable source-entity details.
@@ -110,15 +110,13 @@ individual_consumers:
     entity: sensor.bitcoin_miner_pv_energy_total
     value_per_kwh: 0.05
     baseline: 1200
-    icon: mdi:pickaxe
   - name: Wallbox
     entity: sensor.wallbox_external_cars_pv_energy_total
     value_per_kwh: 0.13
     baseline: 350
-    icon: mdi:ev-station
 ```
 
-The card subtracts these values from regular self-consumption. It then values every individual consumer with its configured `value_per_kwh`. The sensors must expose cumulative energy in `Wh`, `kWh`, or `MWh`. Power sensors are not supported.
+The card subtracts these values from regular self-consumption. It then values every individual consumer with its configured `value_per_kwh`. The main breakdown shows the complete self-consumption total and opens individual consumers as a simple list from a small link. The sensors must expose cumulative energy in `Wh`, `kWh`, or `MWh`. Power sensors are not supported.
 
 ### Combining several energy sources
 
@@ -146,7 +144,7 @@ These options cover the normal production-based setup, pricing, card identity, a
 | `locale`                     | No       | Home Assistant language   | Language and number format override. Example: `de-DE` or `en-US`. German and English card texts are included.                                                                                                                                                                                    |
 | `display_style`              | No       | `full`                    | Selects the card layout. Use `full` for visible labels or `compact` for a shorter two-row value layout with localized tooltips. Example: `compact`.                                                                                                                                              |
 | `show_contribution_segments` | No       | `false`                   | Shows self-consumption as a blue segment and export as a green segment in the progress bar. The corresponding breakdown values use the same colors and open source details when clicked.                                                                                                         |
-| `individual_consumers`       | No       | `[]`                      | List of PV-only consumer energy sensors with custom values. Each entry requires `name`, `entity`, and `value_per_kwh`. Optional `baseline` and `icon` values configure the accounting start and display. Grid energy must already be removed.                                                    |
+| `individual_consumers`       | No       | `[]`                      | List of PV-only consumer energy sensors with custom values. Each entry requires `name`, `entity`, and `value_per_kwh`. An optional `baseline` configures the accounting start. Grid energy must already be removed.                                                                              |
 
 ### Advanced settings
 

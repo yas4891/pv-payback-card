@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.7.2 - 2026-09-24
+
+- Individual consumers now stay in a simple list behind a small link below self-consumption.
+- The visual editor no longer offers icons for individual consumers.
+- The self-consumption summary now shows the complete energy and mixed monetary value without a `Regular` prefix.
+
 ## 0.7.1 - 2026-09-24
 
 - The scenario dialog now expands to show every payback value without clipping the final column.

@@ -4,8 +4,8 @@ export const translations = {
     benefit: "Bisheriger Ertrag",
     progress: "Amortisation",
     own: "Eigenverbrauch",
-    regularOwn: "Regulärer Eigenverbrauch",
     export: "Einspeisung",
+    individualConsumers: "Individuelle Verbraucher",
     individualConsumersExceedSelfConsumption:
       "Die individuellen Verbräuche überschreiten den gesamten PV-Eigenverbrauch. Prüfe Sensoren und Ausgangswerte.",
     expected: "Voraussichtlich amortisiert",
@@ -48,8 +48,8 @@ export const translations = {
     benefit: "Benefit to date",
     progress: "Payback",
     own: "Self-consumption",
-    regularOwn: "Regular self-consumption",
     export: "Export",
+    individualConsumers: "Individual consumers",
     individualConsumersExceedSelfConsumption:
       "Individual consumption exceeds total PV self-consumption. Check the sensors and baselines.",
     expected: "Estimated payback",
@@ -131,7 +131,6 @@ export const editorTranslations = {
     individual_consumer_entity: "PV-Energie-Entität",
     individual_consumer_value: "Wert pro kWh",
     individual_consumer_baseline: "Ausgangswert (kWh)",
-    individual_consumer_icon: "Symbol (optional)",
   },
   en: {
     advanced_settings: "Advanced settings",
@@ -174,6 +173,5 @@ export const editorTranslations = {
     individual_consumer_entity: "PV energy entity",
     individual_consumer_value: "Value per kWh",
     individual_consumer_baseline: "Baseline (kWh)",
-    individual_consumer_icon: "Icon (optional)",
   },
 } as const;
