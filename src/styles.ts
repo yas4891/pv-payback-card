@@ -512,12 +512,17 @@ export const cardStyles = css`
   .scenario-values {
     display: grid;
     grid-template-columns: minmax(100px, 0.8fr) repeat(3, minmax(120px, 1fr));
-    gap: 12px;
+    column-gap: 12px;
+    row-gap: 4px;
+    align-content: start;
   }
   .scenario-values div {
     display: grid;
     min-width: 0;
-    gap: 4px;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    align-content: start;
+    align-items: start;
   }
   .scenario-values span {
     font-size: 0.88em;
@@ -526,7 +531,12 @@ export const cardStyles = css`
   .scenario-values strong {
     overflow-wrap: anywhere;
   }
-  .scenario-values strong:last-child {
+  .scenario-values strong {
+    text-align: end;
+  }
+  .scenario-values .scenario-annual-return {
+    justify-self: end;
+    font-size: 0.78em;
     text-align: end;
   }
   @media (max-width: 520px) {
@@ -572,7 +582,11 @@ export const cardStyles = css`
     .scenario-values {
       grid-template-columns: 1fr;
     }
-    .scenario-values strong:last-child {
+    .scenario-values strong {
+      text-align: start;
+    }
+    .scenario-values .scenario-annual-return {
+      justify-self: start;
       text-align: start;
     }
   }

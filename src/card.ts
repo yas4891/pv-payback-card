@@ -520,7 +520,15 @@ export class PVPaybackCard extends LitElement {
               }
               <div class="scenario-values">
                 <div class="scenario-benefit">
-                  <span>${t.benefit}</span><strong>${this.formatMoney(scenario.benefit, 2)}</strong>
+                  <span>${t.benefit}</span><strong>${this.formatMoney(scenario.benefit, 2)}</strong
+                  ><span class="scenario-annual-return"
+                    >${
+                      scenario.annualReturn === undefined
+                        ? "—"
+                        : this.formatPercentage(scenario.annualReturn)
+                    }
+                    ${t.annualReturn}</span
+                  >
                 </div>
                 <div class="scenario-payback-date">
                   <span>${t.expected}</span

@@ -4,6 +4,7 @@ import {
   appliesAnnualDiscount,
   cacheKey,
   calendarDuration,
+  calculateAnnualReturn,
   calculatePayback,
   calculateScenarioComparisons,
   calculateSeasonalPaybackDate,
@@ -68,6 +69,38 @@ describe("energyToKwh", () => {
   it("rejects unsupported units and values", () => {
     expect(energyToKwh(1, "W")).toBeUndefined();
     expect(energyToKwh(Number.NaN, "kWh")).toBeUndefined();
+  });
+});
+
+describe("calculateAnnualReturn", () => {
+  it("annualizes observed benefit by elapsed calendar days", () => {
+    const annualReturn = calculateAnnualReturn(
+      "2026-01-01",
+      10_000,
+      1_000,
+      new Date("2027-01-01T12:00:00"),
+    );
+
+    expect(annualReturn).toBeCloseTo((1_000 / 10_000 / (365 / 365.2425)) * 100);
+    expect(Number.isFinite(annualReturn)).toBe(true);
+  });
+
+  it("returns zero for a zero benefit after a positive duration", () => {
+    expect(calculateAnnualReturn("2026-01-01", 10_000, 0, new Date("2026-02-01T00:00:00"))).toBe(0);
+  });
+
+  it("rejects invalid inputs and a start date that has not passed", () => {
+    const now = new Date("2026-01-01T12:00:00");
+
+    expect(calculateAnnualReturn("2026-01-01", 10_000, 1_000, now)).toBeUndefined();
+    expect(calculateAnnualReturn("2026-01-02", 10_000, 1_000, now)).toBeUndefined();
+    expect(calculateAnnualReturn("2026-02-30", 10_000, 1_000, now)).toBeUndefined();
+    expect(calculateAnnualReturn("2025-01-01", 0, 1_000, now)).toBeUndefined();
+    expect(calculateAnnualReturn("2025-01-01", Number.NaN, 1_000, now)).toBeUndefined();
+    expect(
+      calculateAnnualReturn("2025-01-01", 10_000, Number.POSITIVE_INFINITY, now),
+    ).toBeUndefined();
+    expect(calculateAnnualReturn("2025-01-01", 10_000, 1_000, new Date("invalid"))).toBeUndefined();
   });
 });
 
@@ -336,6 +369,7 @@ describe("scenario comparison", () => {
       scenarios.seasonal.paybackDate?.getTime(),
     );
     expect(scenarios.discounted.benefit).toBeLessThan(scenarios.seasonal.benefit);
+    expect(scenarios.discounted.annualReturn).toBeLessThan(scenarios.seasonal.annualReturn!);
   });
 
   it("uses three percent for the comparison when no discount rate is configured", () => {

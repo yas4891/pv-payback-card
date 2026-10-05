@@ -2,6 +2,7 @@ export const translations = {
   de: {
     title: "Amortisation der PV-Anlage",
     benefit: "Bisheriger Ertrag",
+    annualReturn: "p.a. Ertrag",
     progress: "Amortisation",
     own: "Eigenverbrauch",
     export: "Einspeisung",
@@ -46,6 +47,7 @@ export const translations = {
   en: {
     title: "Solar payback",
     benefit: "Benefit to date",
+    annualReturn: "p.a. return",
     progress: "Payback",
     own: "Self-consumption",
     export: "Export",

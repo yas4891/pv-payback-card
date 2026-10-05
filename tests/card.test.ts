@@ -273,6 +273,15 @@ describe("scenario dialog", () => {
         (scenario) => (scenario.querySelector("ha-icon") as HTMLElement & { icon?: string }).icon,
       ),
     ).toEqual(["mdi:chart-line", "mdi:weather-sunny", "mdi:percent-circle-outline"]);
+    const benefit = scenarios[0].querySelector(".scenario-benefit") as HTMLElement;
+    expect(Array.from(benefit.children).map((child) => child.tagName)).toEqual([
+      "SPAN",
+      "STRONG",
+      "SPAN",
+    ]);
+    const annualReturn = benefit.querySelector(".scenario-annual-return") as HTMLElement;
+    expect(annualReturn.textContent?.replace(/\s+/g, " ")).toMatch(/% p\.a\. return/);
+    expect(annualReturn.textContent).not.toContain("%%");
   });
 
   it("opens the localized comparison from the payback date", async () => {
@@ -289,6 +298,9 @@ describe("scenario dialog", () => {
     expect(dialog.textContent).toContain("Mit Saisonalität");
     expect(dialog.textContent).toContain("Mit Saisonalität und Abzinsung");
     expect(dialog.textContent).toMatch(/Abzinsungssatz: 5\s*%/);
+    const annualReturn = dialog.querySelector(".scenario-annual-return") as HTMLElement;
+    expect(annualReturn.textContent?.replace(/\s+/g, " ")).toMatch(/% p\.a\. Ertrag/);
+    expect(annualReturn.textContent).not.toContain("%%");
   });
 
   it("labels the default comparison discount rate", async () => {

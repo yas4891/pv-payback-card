@@ -80,6 +80,7 @@ export type Calculation = {
   ownValue: number;
   exportValue: number;
   benefit: number;
+  annualReturn?: number;
   progress: number;
   paybackDate?: Date;
   warning?: string;
@@ -176,6 +177,40 @@ function linearPaybackDate(
 
 export function calendarDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** Returns the annualized return from observed benefit and elapsed calendar days. */
+export function calculateAnnualReturn(
+  startDate: string,
+  investmentCost: number,
+  benefit: number,
+  now: Date,
+): number | undefined {
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate);
+  const start = new Date(`${startDate}T00:00:00`);
+  if (
+    !dateParts ||
+    Number.isNaN(start.getTime()) ||
+    start.getFullYear() !== Number(dateParts[1]) ||
+    start.getMonth() !== Number(dateParts[2]) - 1 ||
+    start.getDate() !== Number(dateParts[3]) ||
+    !Number.isFinite(now.getTime()) ||
+    !Number.isFinite(investmentCost) ||
+    investmentCost <= 0 ||
+    !Number.isFinite(benefit)
+  )
+    return undefined;
+
+  const startDay = calendarDay(start);
+  const nowDay = calendarDay(now);
+  const elapsedDays =
+    (Date.UTC(nowDay.getFullYear(), nowDay.getMonth(), nowDay.getDate()) -
+      Date.UTC(startDay.getFullYear(), startDay.getMonth(), startDay.getDate())) /
+    86_400_000;
+  if (!Number.isFinite(elapsedDays) || elapsedDays <= 0) return undefined;
+
+  const annualReturn = (benefit / investmentCost / (elapsedDays / DAYS_PER_YEAR)) * 100;
+  return Number.isFinite(annualReturn) ? annualReturn : undefined;
 }
 
 /** Counts complete calendar months, then the remaining calendar days. */
@@ -669,6 +704,7 @@ export function calculatePayback(
       ownValue,
       exportValue: discounted.exportValue,
       benefit,
+      annualReturn: calculateAnnualReturn(config.start_date, config.investment_cost, benefit, now),
       progress: Math.min(100, (benefit / config.investment_cost) * 100),
       paybackDate: discounted.paybackDate,
     };
@@ -700,6 +736,7 @@ export function calculatePayback(
     ownValue,
     exportValue,
     benefit,
+    annualReturn: calculateAnnualReturn(config.start_date, config.investment_cost, benefit, now),
     progress,
     paybackDate,
   };

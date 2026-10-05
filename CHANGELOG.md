@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.8.0 - 2026-10-05
+
+- You can now compare the annual return below each scenario's Benefit to date amount.
+- Payback scenario values now align at the top for easier comparison.
+
 ## 0.7.2 - 2026-09-24
 
 - Individual consumers now stay in a simple list behind a small link below self-consumption.
